@@ -4,6 +4,7 @@ let currentTab = 'dashboard';
 let allProducts = [];
 let allFollowers = [];
 let allOrders = [];
+let realtimeChannel = null;
 
 // Session state
 let sessionUser = null;
@@ -57,7 +58,23 @@ function buildCallLink(rawPhone) {
   return `tel:${digits}`;
 }
 
-// Toast notifications helper
+// Products at or below this remaining quantity are flagged as "low stock"
+// on the dashboard stat card and on each product card.
+const LOW_STOCK_THRESHOLD = 5;
+
+// Returns how many distinct orders a given customer email has placed with
+// this provider, based on the currently loaded allOrders. Used to flag
+// repeat customers in the orders table/overview — a customer with more
+// than one distinct order_number is a repeat buyer.
+function getCustomerOrderCount(email) {
+  if (!email) return 0;
+  const orderNumbers = new Set(
+    allOrders.filter(o => o.customer_email === email).map(o => o.order_number)
+  );
+  return orderNumbers.size;
+}
+
+
 function showToast(message, type = 'success') {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
@@ -351,6 +368,10 @@ registerForm.addEventListener('submit', async (e) => {
 // Logout Handler
 async function handleLogout() {
   if (confirm('Are you sure you want to log out?')) {
+    if (realtimeChannel) {
+      await supabaseClient.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
     await supabaseClient.auth.signOut();
     currentProvider = null;
     sessionUser = null;
@@ -393,6 +414,8 @@ async function loadProviderProfile(providerId, email) {
     document.getElementById('set-bio').value = currentProvider.bio || '';
     setupPiiField('set-aadhaar', currentProvider.aadhaar_last4 || '');
     setupPiiField('set-pan', currentProvider.pan_last4 || '');
+    document.getElementById('set-is-paused').checked = !!currentProvider.is_paused;
+    document.getElementById('pause-banner').classList.toggle('hidden', !currentProvider.is_paused);
 
     // Load tabs data
     await loadAllData();
@@ -500,6 +523,29 @@ async function loadAllData() {
   ]);
 
   updateDashboardStats();
+  subscribeToNewOrders();
+}
+
+// Live "new order" notifications. Requires order_item_fulfillment to be
+// added to the supabase_realtime publication (see feature_migrations.sql
+// section 4) — if that hasn't been run yet, this subscription simply never
+// fires, no error shown, and the panel behaves exactly as before (manual
+// refresh still works via fetchOrders()).
+function subscribeToNewOrders() {
+  if (!currentProvider || realtimeChannel) return;
+
+  realtimeChannel = supabaseClient
+    .channel(`provider-orders-${currentProvider.id}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'order_item_fulfillment',
+      filter: `provider_id=eq.${currentProvider.id}`
+    }, () => {
+      showToast('New order received!', 'success');
+      fetchOrders().then(updateDashboardStats);
+    })
+    .subscribe();
 }
 
 // 1. PRODUCTS MANAGEMENT
@@ -540,6 +586,9 @@ function renderProducts(productsList = allProducts) {
 
     const fallbackImage = 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=500&auto=format&fit=crop&q=60';
     const imageUrl = (p.product_images && p.product_images.length > 0) ? p.product_images[0] : fallbackImage;
+    const qty = Number(p.available_qty || 0);
+    const stockClass = qty <= LOW_STOCK_THRESHOLD ? 'stock-badge-low' : '';
+    const stockLabel = qty === 0 ? 'Out of stock' : `${qty} left`;
 
     card.innerHTML = `
       <div class="product-image">
@@ -553,7 +602,7 @@ function renderProducts(productsList = allProducts) {
         <p class="product-description">${escapeHtml(p.product_description || 'No description provided.')}</p>
         <div class="product-meta">
           <span class="product-price">₹${Number(p.price_in_rupees).toFixed(2)}</span>
-          <span class="product-stock">${Number(p.available_qty || 0)} left</span>
+          <span class="product-stock ${stockClass}">${stockLabel}</span>
         </div>
         <div class="product-actions">
           <button data-action="edit-product" data-id="${escapeHtml(p.id)}" class="btn btn-secondary">
@@ -857,7 +906,7 @@ async function syncFulfillmentStatuses(rows) {
 
   const { data: existing, error } = await supabaseClient
     .from('order_item_fulfillment')
-    .select('order_item_id, status')
+    .select('order_item_id, status, tracking_number, estimated_delivery')
     .in('order_item_id', itemIds);
 
   if (error) {
@@ -866,9 +915,9 @@ async function syncFulfillmentStatuses(rows) {
     return;
   }
 
-  const statusByItemId = new Map((existing || []).map(row => [row.order_item_id, row.status]));
+  const fulfillmentByItemId = new Map((existing || []).map(row => [row.order_item_id, row]));
 
-  const missing = rows.filter(r => !statusByItemId.has(r.id));
+  const missing = rows.filter(r => !fulfillmentByItemId.has(r.id));
   if (missing.length > 0) {
     const toInsert = missing.map(r => ({
       order_item_id: r.id,
@@ -878,15 +927,18 @@ async function syncFulfillmentStatuses(rows) {
     const { data: inserted, error: insertErr } = await supabaseClient
       .from('order_item_fulfillment')
       .upsert(toInsert, { onConflict: 'order_item_id' })
-      .select('order_item_id, status');
+      .select('order_item_id, status, tracking_number, estimated_delivery');
 
     if (!insertErr) {
-      (inserted || []).forEach(row => statusByItemId.set(row.order_item_id, row.status));
+      (inserted || []).forEach(row => fulfillmentByItemId.set(row.order_item_id, row));
     }
   }
 
   rows.forEach(r => {
-    r.fulfillment_status = statusByItemId.get(r.id) || r.legacy_status;
+    const fulfillment = fulfillmentByItemId.get(r.id);
+    r.fulfillment_status = fulfillment?.status || r.legacy_status;
+    r.tracking_number = fulfillment?.tracking_number || '';
+    r.estimated_delivery = fulfillment?.estimated_delivery || '';
   });
 }
 
@@ -923,10 +975,12 @@ function renderOrders(ordersList = allOrders) {
     const connectCell = (callIcon || waIcon)
       ? `${callIcon}${waIcon}`
       : '<small class="text-muted">—</small>';
+    const orderCount = getCustomerOrderCount(o.customer_email);
+    const repeatBadge = orderCount > 1 ? `<span class="repeat-badge" title="${orderCount} orders with this customer">Repeat</span>` : '';
     tr.innerHTML = `
       <td><small class="text-muted">${escapeHtml(o.order_number)}</small></td>
       <td>
-        <strong>${escapeHtml(o.customer_name)}</strong><br>
+        <strong>${escapeHtml(o.customer_name)}</strong> ${repeatBadge}<br>
         <small class="text-muted">${escapeHtml(o.customer_email)}</small>
       </td>
       <td>${escapeHtml(o.product_emoji || '🎁')} ${escapeHtml(o.product_name)}</td>
@@ -977,18 +1031,28 @@ function buildMapsLink(address) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
+// Tracks which order item the overview modal is currently showing, so
+// saveOrderTracking() knows what to update without re-parsing the DOM.
+let currentOverviewOrderItemId = null;
+
 function openOrderOverview(orderItemId) {
   const o = allOrders.find(order => String(order.id) === String(orderItemId));
   if (!o) return;
 
+  currentOverviewOrderItemId = o.id;
+
   const status = o.fulfillment_status || o.legacy_status;
   const waLink = buildWhatsAppLink(o.customer_phone);
   const callLink = buildCallLink(o.customer_phone);
+  const orderCount = getCustomerOrderCount(o.customer_email);
 
   document.getElementById('ov-order-number').textContent = o.order_number;
   document.getElementById('ov-status').innerHTML =
     `<span class="badge-status ${escapeHtml(status)}">${escapeHtml(status)}</span>`;
   document.getElementById('ov-customer-name').textContent = o.customer_name;
+  document.getElementById('ov-repeat-badge').innerHTML = orderCount > 1
+    ? `<span class="repeat-badge" title="${orderCount} orders with this customer">Repeat (${orderCount})</span>`
+    : '';
   document.getElementById('ov-customer-email').textContent = o.customer_email;
   document.getElementById('ov-product').textContent =
     `${o.product_emoji || '🎁'} ${o.product_name}`;
@@ -996,6 +1060,8 @@ function openOrderOverview(orderItemId) {
   document.getElementById('ov-unit-price').textContent = `₹${Number(o.unit_price || 0).toFixed(2)}`;
   document.getElementById('ov-total').textContent = `₹${Number(o.line_total || 0).toFixed(2)}`;
   document.getElementById('ov-address').textContent = o.shipping_address || 'No address on file';
+  document.getElementById('ov-tracking-number').value = o.tracking_number || '';
+  document.getElementById('ov-estimated-delivery').value = o.estimated_delivery || '';
 
   const connectEl = document.getElementById('ov-connect');
   const parts = [];
@@ -1025,10 +1091,123 @@ function openOrderOverview(orderItemId) {
 
   document.getElementById('order-overview-modal').classList.remove('hidden');
   if (window.lucide) lucide.createIcons();
+
+  loadOrderHistory(o.id);
+}
+
+// Saves this line item's tracking number + estimated delivery date to its
+// order_item_fulfillment row (per-provider — see feature_migrations.sql
+// section 1 for why this isn't stored on the shared order_shipping row).
+async function saveOrderTracking() {
+  if (!currentOverviewOrderItemId) return;
+  const trackingNumber = document.getElementById('ov-tracking-number').value.trim();
+  const estimatedDelivery = document.getElementById('ov-estimated-delivery').value || null;
+
+  try {
+    const { error } = await supabaseClient
+      .from('order_item_fulfillment')
+      .update({
+        tracking_number: trackingNumber || null,
+        estimated_delivery: estimatedDelivery
+      })
+      .eq('order_item_id', currentOverviewOrderItemId)
+      .eq('provider_id', currentProvider.id);
+
+    if (error) throw error;
+    showToast('Tracking info saved!');
+    await fetchOrders();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// Loads and renders this line item's status change history. Fetched
+// on-demand (rather than bulk-loaded with every order) since it's only
+// needed while the overview modal for that one order is open.
+async function loadOrderHistory(orderItemId) {
+  const list = document.getElementById('ov-history-list');
+  list.innerHTML = `<li class="text-muted">Loading history...</li>`;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('order_item_fulfillment_history')
+      .select('status, changed_at')
+      .eq('order_item_id', orderItemId)
+      .order('changed_at', { ascending: true });
+
+    if (error) throw error;
+
+    // Guard against the modal having moved on to a different order while
+    // this request was in flight.
+    if (currentOverviewOrderItemId !== orderItemId) return;
+
+    if (!data || data.length === 0) {
+      list.innerHTML = `<li class="text-muted">No history recorded yet.</li>`;
+      return;
+    }
+
+    list.innerHTML = data.map(h => `
+      <li>
+        <span class="badge-status ${escapeHtml(h.status)}">${escapeHtml(h.status)}</span>
+        <span class="history-time">${escapeHtml(new Date(h.changed_at).toLocaleString())}</span>
+      </li>
+    `).join('');
+  } catch (err) {
+    // Non-fatal — most likely feature_migrations.sql hasn't been run yet on
+    // this project (table doesn't exist), so fail quietly here rather than
+    // toasting an error every time someone opens an order.
+    list.innerHTML = `<li class="text-muted">History unavailable.</li>`;
+  }
 }
 
 function closeOrderOverviewModal() {
   document.getElementById('order-overview-modal').classList.add('hidden');
+  currentOverviewOrderItemId = null;
+}
+
+// Groups allOrders' revenue by calendar day for the last 14 days and draws
+// a simple bar chart — no charting library needed for something this
+// small, keeps the panel's dependency footprint the same as before.
+function renderRevenueChart() {
+  const container = document.getElementById('revenue-chart');
+  if (!container) return;
+
+  const days = 14;
+  const buckets = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    buckets.push({ date: d, total: 0 });
+  }
+
+  allOrders.forEach(o => {
+    if (!o.placed_at) return;
+    const placed = new Date(o.placed_at);
+    placed.setHours(0, 0, 0, 0);
+    const bucket = buckets.find(b => b.date.getTime() === placed.getTime());
+    if (bucket) bucket.total += Number(o.line_total || 0);
+  });
+
+  const maxTotal = Math.max(...buckets.map(b => b.total), 1);
+
+  if (buckets.every(b => b.total === 0)) {
+    container.innerHTML = `<p class="text-muted text-center" style="width:100%;">No revenue in the last 14 days yet.</p>`;
+    return;
+  }
+
+  container.innerHTML = buckets.map(b => {
+    const heightPct = Math.max((b.total / maxTotal) * 100, b.total > 0 ? 4 : 0);
+    const label = b.date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    return `
+      <div class="revenue-bar-wrap" title="₹${b.total.toFixed(2)} on ${escapeHtml(label)}">
+        <div class="revenue-bar" style="height: ${heightPct}%;"></div>
+        <span class="revenue-bar-label">${escapeHtml(label)}</span>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderRecentOrders() {
@@ -1059,14 +1238,80 @@ function renderRecentOrders() {
   });
 }
 
+// Applies status, free-text search (order number / customer name / product
+// name), and placed-on date-range filters together — all three narrow the
+// same list rather than being mutually exclusive tabs.
+function getFilteredOrders() {
+  const statusVal = document.getElementById('order-status-filter').value;
+  const searchVal = (document.getElementById('order-search').value || '').trim().toLowerCase();
+  const fromVal = document.getElementById('order-date-from').value;
+  const toVal = document.getElementById('order-date-to').value;
+
+  return allOrders.filter(o => {
+    const status = o.fulfillment_status || o.legacy_status;
+    if (statusVal !== 'all' && status !== statusVal) return false;
+
+    if (searchVal) {
+      const haystack = `${o.order_number} ${o.customer_name} ${o.product_name}`.toLowerCase();
+      if (!haystack.includes(searchVal)) return false;
+    }
+
+    if (fromVal || toVal) {
+      const placedDate = o.placed_at ? new Date(o.placed_at) : null;
+      if (!placedDate) return false;
+      const placedDay = placedDate.toISOString().slice(0, 10);
+      if (fromVal && placedDay < fromVal) return false;
+      if (toVal && placedDay > toVal) return false;
+    }
+
+    return true;
+  });
+}
+
 function filterOrders() {
-  const val = document.getElementById('order-status-filter').value;
-  if (val === 'all') {
-    renderOrders(allOrders);
-  } else {
-    const filtered = allOrders.filter(o => (o.fulfillment_status || o.legacy_status) === val);
-    renderOrders(filtered);
+  renderOrders(getFilteredOrders());
+}
+
+// Exports whatever is currently visible in the (filtered) orders table as a
+// CSV file the provider can open in Excel/Sheets for accounting records.
+function exportOrdersCsv() {
+  const rows = getFilteredOrders();
+  if (rows.length === 0) {
+    showToast('No orders to export with the current filters.', 'warning');
+    return;
   }
+
+  const headers = ['Order Number', 'Placed At', 'Customer Name', 'Customer Email', 'Product', 'Quantity', 'Unit Price', 'Total', 'Shipping Address', 'Status'];
+
+  // Wraps a value for safe CSV inclusion — quotes it and escapes embedded
+  // quotes, since customer names/addresses can contain commas.
+  const csvCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+  const lines = [headers.map(csvCell).join(',')];
+  rows.forEach(o => {
+    lines.push([
+      o.order_number,
+      o.placed_at ? new Date(o.placed_at).toLocaleString() : '',
+      o.customer_name,
+      o.customer_email,
+      o.product_name,
+      Number(o.quantity),
+      Number(o.unit_price || 0).toFixed(2),
+      Number(o.line_total || 0).toFixed(2),
+      o.shipping_address,
+      o.fulfillment_status || o.legacy_status
+    ].map(csvCell).join(','));
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // Updates fulfillment status for ONE order line item, scoped to this
@@ -1086,6 +1331,29 @@ async function updateOrderStatus(orderItemId, status) {
     showToast('Order status updated successfully!');
     await fetchOrders();
   } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// Flips the provider's holiday/pause flag. See feature_migrations.sql
+// section 3 for the scope note: this updates the provider's own panel
+// state and banner only, not public storefront visibility.
+async function toggleStorePause() {
+  const checkbox = document.getElementById('set-is-paused');
+  const newValue = checkbox.checked;
+
+  try {
+    const { error } = await supabaseClient
+      .from('providers')
+      .update({ is_paused: newValue })
+      .eq('id', currentProvider.id);
+
+    if (error) throw error;
+    currentProvider.is_paused = newValue;
+    document.getElementById('pause-banner').classList.toggle('hidden', !newValue);
+    showToast(newValue ? 'Store paused.' : 'Store is active again.');
+  } catch (err) {
+    checkbox.checked = !newValue; // revert the toggle if the save failed
     showToast(err.message, 'error');
   }
 }
@@ -1148,6 +1416,11 @@ function updateDashboardStats() {
 
   document.getElementById('stat-revenue').textContent = `₹${totalRevenue.toFixed(2)}`;
   document.getElementById('stat-orders').textContent = allOrders.length;
+
+  const lowStockCount = allProducts.filter(p => Number(p.available_qty || 0) <= LOW_STOCK_THRESHOLD).length;
+  document.getElementById('stat-lowstock').textContent = lowStockCount;
+
+  renderRevenueChart();
 
   // Render Top Products List
   const topProductsList = document.getElementById('top-products-list');
