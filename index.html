@@ -12,6 +12,8 @@
   <script src="https://unpkg.com/lucide@1.25.0"></script>
   <!-- Supabase JS Client CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- html2canvas — used to render the order preview card as a shareable PNG image -->
+  <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <!-- App Styles -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -642,11 +644,18 @@
         </div>
         <div class="overview-section">
           <h3>Share &amp; Collect Payment</h3>
-          <a id="ov-share-whatsapp" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary full-width share-whatsapp-btn">
-            <i data-lucide="share-2"></i>
-            <span>Share Order Preview on WhatsApp</span>
-          </a>
-          <div class="payment-buttons-row">
+          <div class="share-buttons-row">
+            <a id="ov-share-whatsapp" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary share-whatsapp-btn whatsapp-accent">
+              <i data-lucide="message-circle"></i>
+              <span>Share as Text</span>
+            </a>
+            <button type="button" id="ov-share-image-btn" onclick="shareOrderPreviewImage()" class="btn btn-secondary share-whatsapp-btn">
+              <i data-lucide="image"></i>
+              <span>Share as Image</span>
+            </button>
+          </div>
+          <small class="help-text">"Share as Image" sends the exact order preview card (like a receipt) — pick WhatsApp from the share sheet, or it downloads the image if your device/browser can't share files directly.</small>
+          <div class="payment-buttons-row" style="margin-top: 14px;">
             <a id="ov-pay-gpay" href="#" class="payment-btn" title="Request payment via Google Pay">
               <img src="https://i.pinimg.com/564x/67/28/d8/6728d8f618ff531833c69bd830569376.jpg" alt="Google Pay">
               <span>Google Pay</span>
