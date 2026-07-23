@@ -1352,14 +1352,25 @@ textarea:focus {
   height: 16px;
 }
 
-/* SHARE ORDER PREVIEW ON WHATSAPP */
-.share-whatsapp-btn {
-  background-color: #25D366;
-  color: #fff;
-  margin-bottom: 14px;
+/* SHARE ORDER PREVIEW (text to WhatsApp / image to any share target) */
+.share-buttons-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
-.share-whatsapp-btn:hover {
+.share-whatsapp-btn {
+  width: 100%;
+}
+
+.whatsapp-accent {
+  background-color: #25D366;
+  color: #fff;
+  border-color: transparent;
+}
+
+.whatsapp-accent:hover {
   background-color: #1ebe5a;
   box-shadow: var(--shadow-glow);
 }
@@ -1405,6 +1416,119 @@ textarea:focus {
   opacity: 0.5;
   pointer-events: none;
   cursor: not-allowed;
+}
+
+/* SHARE CARD — rendered off-screen (see shareOrderPreviewImage in app.js)
+   and captured with html2canvas, so this never appears in the live UI. */
+.share-card {
+  width: 360px;
+  background-color: #ffffff;
+  padding: 28px;
+  font-family: var(--font-sans);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.share-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.share-card-logo {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.share-card-logo b {
+  color: var(--heading-color);
+}
+
+.share-card-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background-color: var(--success-bg);
+  color: var(--success);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.share-card-order-no {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.share-card-product {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.share-card-emoji {
+  font-size: 2rem;
+}
+
+.share-card-product-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.share-card-qty {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.share-card-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.share-card-total {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--heading-color);
+}
+
+.share-card-divider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 8px 0 14px;
+}
+
+.share-card-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  padding: 5px 0;
+}
+
+.share-card-row span:last-child {
+  text-align: right;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.share-card-footer {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 
 /* RESPONSIVENESS */
@@ -1671,6 +1795,9 @@ textarea:focus {
     padding: 16px 16px 14px;
   }
   .payment-buttons-row {
+    grid-template-columns: 1fr;
+  }
+  .share-buttons-row {
     grid-template-columns: 1fr;
   }
   #toast-container {
