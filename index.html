@@ -121,6 +121,24 @@
 
     <!-- PANEL SECTION (LOGGED IN) -->
     <div id="panel-section" class="hidden">
+
+      <!-- Mobile Topbar (visible on small/mobile screens only, sidebar becomes a bottom nav there) -->
+      <header class="mobile-topbar">
+        <div class="mobile-topbar-brand">
+          <span class="logo">doodle <span>G</span></span>
+          <span class="badge">Provider</span>
+        </div>
+        <div class="mobile-topbar-actions">
+          <button type="button" class="icon-btn" id="mobile-search-btn" title="Search" aria-label="Search">
+            <i data-lucide="search"></i>
+          </button>
+          <a class="icon-btn" href="https://doodle-g-1tbe.vercel.app/" target="_blank" rel="noopener noreferrer" title="Visit Doodle G Marketplace" aria-label="Visit Doodle G Marketplace">
+            <i data-lucide="external-link"></i>
+          </a>
+          <img id="provider-avatar-mobile" class="mobile-topbar-avatar" src="https://api.dicebear.com/7.x/initials/svg?seed=Store" alt="Provider Avatar" onclick="switchTab('settings')">
+        </div>
+      </header>
+
       <!-- Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-header">
@@ -176,6 +194,10 @@
             <p id="page-subtitle" class="text-muted">Welcome back, get an instant health check of your business.</p>
           </div>
           <div class="header-actions">
+            <a class="btn-visit-store" href="https://doodle-g-1tbe.vercel.app/" target="_blank" rel="noopener noreferrer" title="Visit the Doodle G marketplace">
+              <i data-lucide="external-link"></i>
+              <span>Visit Main Site</span>
+            </a>
             <div class="live-indicator">
               <span class="dot animate-pulse"></span>
               <span>Live Mode</span>
