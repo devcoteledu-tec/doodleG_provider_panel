@@ -180,6 +180,13 @@
           </div>
         </header>
 
+        <!-- Holiday / Pause Mode banner — shown only when the store is paused -->
+        <div id="pause-banner" class="pause-banner hidden">
+          <i data-lucide="pause-circle"></i>
+          <span>Your store is currently paused. Customers can still see past orders, but this is a reminder to turn it back on when you're ready to sell again.</span>
+          <button onclick="switchTab('settings')" class="btn-text">Manage in Settings</button>
+        </div>
+
         <!-- View Content Containers -->
         <div id="content-area">
           
@@ -222,6 +229,25 @@
                   <h3>Orders Fulfilled</h3>
                   <p id="stat-orders">0</p>
                 </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon icon-lowstock">
+                  <i data-lucide="alert-triangle"></i>
+                </div>
+                <div class="stat-details">
+                  <h3>Low Stock Items</h3>
+                  <p id="stat-lowstock">0</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Revenue Trend -->
+            <div class="card">
+              <div class="card-header">
+                <h2>Revenue Trend — Last 14 Days</h2>
+              </div>
+              <div class="card-body">
+                <div id="revenue-chart" class="revenue-chart"></div>
               </div>
             </div>
 
@@ -323,6 +349,12 @@
               <div class="card-header">
                 <h2>Incoming Order Items</h2>
                 <div class="filter-actions">
+                  <div class="search-box sm">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="order-search" placeholder="Customer, order #, product..." oninput="filterOrders()">
+                  </div>
+                  <input type="date" id="order-date-from" title="From date" onchange="filterOrders()">
+                  <input type="date" id="order-date-to" title="To date" onchange="filterOrders()">
                   <select id="order-status-filter" onchange="filterOrders()">
                     <option value="all">All Statuses</option>
                     <option value="confirmed">Confirmed</option>
@@ -331,6 +363,10 @@
                     <option value="delivered">Delivered</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
+                  <button onclick="exportOrdersCsv()" class="btn btn-secondary" title="Export currently filtered orders to CSV">
+                    <i data-lucide="download"></i>
+                    <span>Export CSV</span>
+                  </button>
                 </div>
               </div>
               <div class="card-body">
@@ -416,6 +452,19 @@
                   </div>
                   <button type="submit" class="btn btn-primary">Save Profile Details</button>
                 </form>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h2>Holiday / Pause Mode</h2>
+              </div>
+              <div class="card-body">
+                <div class="checkbox-group">
+                  <input type="checkbox" id="set-is-paused" onchange="toggleStorePause()">
+                  <label for="set-is-paused" style="margin-bottom: 0;">Pause my store</label>
+                </div>
+                <small class="help-text">Use this when you're away or out of stock storewide. It's a reminder flag on your own panel — see the note in Settings if you also want it to hide your products from customers, which needs a small additional step on the storefront side.</small>
               </div>
             </div>
           </div>
@@ -510,7 +559,7 @@
           <h3>Customer</h3>
           <div class="overview-row">
             <span class="overview-label">Name</span>
-            <span id="ov-customer-name" class="overview-value"></span>
+            <span><span id="ov-customer-name" class="overview-value"></span> <span id="ov-repeat-badge"></span></span>
           </div>
           <div class="overview-row">
             <span class="overview-label">Email</span>
@@ -544,6 +593,22 @@
             <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcReCQD1Pm1nNZSCmupQAGlQ2hThFWNiWW-FjfLRLkrnwA&s=10" alt="View shipping address on Google Maps" class="map-preview-img">
             <span class="map-preview-caption"><i data-lucide="map-pin"></i> Open in Google Maps</span>
           </a>
+        </div>
+        <div class="overview-section">
+          <h3>Tracking &amp; Delivery</h3>
+          <div class="form-group">
+            <label for="ov-tracking-number">Tracking Number</label>
+            <input type="text" id="ov-tracking-number" placeholder="e.g. SF123456789IN">
+          </div>
+          <div class="form-group">
+            <label for="ov-estimated-delivery">Estimated Delivery Date</label>
+            <input type="date" id="ov-estimated-delivery">
+          </div>
+          <button type="button" onclick="saveOrderTracking()" class="btn btn-primary full-width">Save Tracking Info</button>
+        </div>
+        <div class="overview-section">
+          <h3>Status History</h3>
+          <ul id="ov-history-list" class="history-list"></ul>
         </div>
       </div>
     </div>
