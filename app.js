@@ -396,11 +396,17 @@ async function loadProviderProfile(providerId, email) {
     // Update sidebar UI info
     document.getElementById('provider-display-name').textContent = currentProvider.name;
     document.getElementById('provider-display-email').textContent = email;
-    if (currentProvider.avatar_url) {
-      document.getElementById('provider-avatar').src = currentProvider.avatar_url;
-    } else {
-      document.getElementById('provider-avatar').src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(currentProvider.name)}`;
-    }
+    const avatarSrc = currentProvider.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(currentProvider.name)}`;
+    document.getElementById('provider-avatar').src = avatarSrc;
+
+    // Mirror into the Settings profile header (also the reachable-on-mobile
+    // logout access point — see settings-profile-card in index.html)
+    const nameSettingsEl = document.getElementById('provider-display-name-settings');
+    const emailSettingsEl = document.getElementById('provider-display-email-settings');
+    const avatarSettingsEl = document.getElementById('provider-avatar-settings');
+    if (nameSettingsEl) nameSettingsEl.textContent = currentProvider.name;
+    if (emailSettingsEl) emailSettingsEl.textContent = email;
+    if (avatarSettingsEl) avatarSettingsEl.src = avatarSrc;
 
     // Display dashboard UI
     authSection.classList.add('hidden');
@@ -978,22 +984,22 @@ function renderOrders(ordersList = allOrders) {
     const orderCount = getCustomerOrderCount(o.customer_email);
     const repeatBadge = orderCount > 1 ? `<span class="repeat-badge" title="${orderCount} orders with this customer">Repeat</span>` : '';
     tr.innerHTML = `
-      <td><small class="text-muted">${escapeHtml(o.order_number)}</small></td>
-      <td>
+      <td data-label="Order #"><small class="text-muted">${escapeHtml(o.order_number)}</small></td>
+      <td data-label="Customer">
         <strong>${escapeHtml(o.customer_name)}</strong> ${repeatBadge}<br>
         <small class="text-muted">${escapeHtml(o.customer_email)}</small>
       </td>
-      <td>${escapeHtml(o.product_emoji || '🎁')} ${escapeHtml(o.product_name)}</td>
-      <td>${Number(o.quantity)}</td>
-      <td>₹${Number(o.unit_price || 0).toFixed(2)}</td>
-      <td><strong>₹${Number(o.line_total || 0).toFixed(2)}</strong></td>
-      <td><small>${escapeHtml(o.shipping_address)}</small></td>
-      <td>
+      <td data-label="Product">${escapeHtml(o.product_emoji || '🎁')} ${escapeHtml(o.product_name)}</td>
+      <td data-label="Qty">${Number(o.quantity)}</td>
+      <td data-label="Price/Unit">₹${Number(o.unit_price || 0).toFixed(2)}</td>
+      <td data-label="Total"><strong>₹${Number(o.line_total || 0).toFixed(2)}</strong></td>
+      <td data-label="Shipping Address"><small>${escapeHtml(o.shipping_address)}</small></td>
+      <td data-label="Status">
         <span class="badge-status ${escapeHtml(status)}">${escapeHtml(status)}</span>
       </td>
-      <td>${connectCell}</td>
-      <td>
-        <select data-order-item-id="${escapeHtml(o.id)}" class="table-select order-status-select" style="background-color: var(--bg-surface-elevated); color: var(--text-primary); border-radius: var(--radius-sm); border: 1px solid var(--border-color); padding: 4px;">
+      <td data-label="Connect" class="connect-cell">${connectCell}</td>
+      <td data-label="Action">
+        <select data-order-item-id="${escapeHtml(o.id)}" class="table-select order-status-select">
           <option value="confirmed" ${status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
           <option value="processing" ${status === 'processing' ? 'selected' : ''}>Processing</option>
           <option value="shipped" ${status === 'shipped' ? 'selected' : ''}>Shipped</option>
@@ -1405,6 +1411,45 @@ settingsForm.addEventListener('submit', async (e) => {
 });
 
 // Update Statistics Cards & Top Products
+// Renders the actual low-stock items (not just the count) so a provider can
+// act on them directly from the dashboard instead of hunting through
+// My Products. Clicking an item jumps to Products with that item searched.
+function renderLowStockAlerts(lowStockProducts) {
+  const list = document.getElementById('low-stock-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  if (!lowStockProducts || lowStockProducts.length === 0) {
+    list.innerHTML = `<li class="text-muted text-center py-4">All products are well stocked.</li>`;
+    return;
+  }
+
+  lowStockProducts
+    .slice()
+    .sort((a, b) => Number(a.available_qty || 0) - Number(b.available_qty || 0))
+    .forEach(p => {
+      const li = document.createElement('li');
+      li.className = 'low-stock-item';
+      const qty = Number(p.available_qty || 0);
+      li.innerHTML = `
+        <div class="low-stock-info">
+          <h4>${escapeHtml(p.product_name)}</h4>
+          <p>${escapeHtml(p.category || 'Uncategorized')}</p>
+        </div>
+        <span class="low-stock-qty ${qty === 0 ? 'zero' : ''}">${qty} left</span>
+      `;
+      li.addEventListener('click', () => {
+        switchTab('products');
+        const searchBox = document.getElementById('product-search');
+        if (searchBox) {
+          searchBox.value = p.product_name;
+          filterProducts();
+        }
+      });
+      list.appendChild(li);
+    });
+}
+
 function updateDashboardStats() {
   document.getElementById('stat-products').textContent = allProducts.length;
   document.getElementById('stat-followers').textContent = allFollowers.length;
@@ -1417,9 +1462,35 @@ function updateDashboardStats() {
   document.getElementById('stat-revenue').textContent = `₹${totalRevenue.toFixed(2)}`;
   document.getElementById('stat-orders').textContent = allOrders.length;
 
-  const lowStockCount = allProducts.filter(p => Number(p.available_qty || 0) <= LOW_STOCK_THRESHOLD).length;
-  document.getElementById('stat-lowstock').textContent = lowStockCount;
+  const lowStockProducts = allProducts.filter(p => Number(p.available_qty || 0) <= LOW_STOCK_THRESHOLD);
+  document.getElementById('stat-lowstock').textContent = lowStockProducts.length;
 
+  // Quick Insights: average order value + how many line items still need
+  // the provider's attention (i.e. not yet shipped/delivered/cancelled).
+  const avgOrderValue = allOrders.length > 0 ? (totalRevenue / allOrders.length) : 0;
+  const pendingActionCount = allOrders.filter(o => {
+    const s = o.fulfillment_status || o.legacy_status;
+    return s === 'confirmed' || s === 'processing';
+  }).length;
+
+  const aovEl = document.getElementById('stat-aov');
+  if (aovEl) aovEl.textContent = `₹${avgOrderValue.toFixed(2)}`;
+  const pendingEl = document.getElementById('stat-pending');
+  if (pendingEl) pendingEl.textContent = pendingActionCount;
+
+  // Badge dot on the Orders nav item so a provider glancing at the sidebar
+  // (or bottom bar, on mobile) can tell there's something to action.
+  const ordersBadge = document.getElementById('orders-pending-badge');
+  if (ordersBadge) {
+    if (pendingActionCount > 0) {
+      ordersBadge.textContent = pendingActionCount > 99 ? '99+' : pendingActionCount;
+      ordersBadge.classList.remove('hidden');
+    } else {
+      ordersBadge.classList.add('hidden');
+    }
+  }
+
+  renderLowStockAlerts(lowStockProducts);
   renderRevenueChart();
 
   // Render Top Products List
