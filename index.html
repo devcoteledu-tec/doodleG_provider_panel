@@ -490,6 +490,65 @@
     </div>
   </div>
 
+  <!-- Order Overview Modal -->
+  <div id="order-overview-modal" class="modal-overlay hidden">
+    <div class="modal-card order-overview-card">
+      <div class="modal-header">
+        <h2>Order Overview</h2>
+        <button onclick="closeOrderOverviewModal()" class="btn-close">&times;</button>
+      </div>
+      <div class="order-overview-body">
+        <div class="overview-row">
+          <span class="overview-label">Order Number</span>
+          <span id="ov-order-number" class="overview-value"></span>
+        </div>
+        <div class="overview-row">
+          <span class="overview-label">Status</span>
+          <span id="ov-status"></span>
+        </div>
+        <div class="overview-section">
+          <h3>Customer</h3>
+          <div class="overview-row">
+            <span class="overview-label">Name</span>
+            <span id="ov-customer-name" class="overview-value"></span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Email</span>
+            <span id="ov-customer-email" class="overview-value"></span>
+          </div>
+          <div id="ov-connect" class="overview-row"></div>
+        </div>
+        <div class="overview-section">
+          <h3>Product</h3>
+          <div class="overview-row">
+            <span class="overview-label">Item</span>
+            <span id="ov-product" class="overview-value"></span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Quantity</span>
+            <span id="ov-quantity" class="overview-value"></span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Price / Unit</span>
+            <span id="ov-unit-price" class="overview-value"></span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Total</span>
+            <span id="ov-total" class="overview-value"></span>
+          </div>
+        </div>
+        <div class="overview-section">
+          <h3>Shipping Address</h3>
+          <p id="ov-address" class="overview-address"></p>
+          <a id="ov-map-link" href="#" target="_blank" rel="noopener noreferrer" class="map-preview-link" title="Open in Google Maps">
+            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcReCQD1Pm1nNZSCmupQAGlQ2hThFWNiWW-FjfLRLkrnwA&s=10" alt="View shipping address on Google Maps" class="map-preview-img">
+            <span class="map-preview-caption"><i data-lucide="map-pin"></i> Open in Google Maps</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Core App Logic -->
   <script src="config.js"></script>
   <script src="app.js"></script>
