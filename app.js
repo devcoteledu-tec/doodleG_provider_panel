@@ -1067,6 +1067,120 @@ function buildMapsLink(address) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
+// ---------------------------------------------------------------------------
+// Share the order preview as an actual image (not just text) — renders a
+// clean, receipt-style card off-screen with html2canvas, then hands the
+// resulting PNG to the Web Share API so the provider can pick WhatsApp (or
+// anything else) from their device's native share sheet.
+//
+// LIMITATION, called out rather than hidden: unlike the "Share as Text"
+// button (which uses wa.me and opens the customer's exact chat), there is
+// no web API that opens WhatsApp straight into a specific contact with a
+// file already attached — only wa.me's text pre-fill can target a chat
+// directly. Once WhatsApp is chosen from the share sheet, the provider
+// still picks the customer's chat themselves (one extra tap). On desktop
+// browsers without file-sharing support, this instead downloads the image
+// and opens the customer's chat in a new tab so it's ready to attach.
+// ---------------------------------------------------------------------------
+function buildShareCardHtml(o, status) {
+  const trackingRow = o.tracking_number
+    ? `<div class="share-card-row"><span>Tracking</span><span>${escapeHtml(o.tracking_number)}</span></div>`
+    : '';
+  return `
+    <div class="share-card-header">
+      <span class="share-card-logo">doodle <b>G</b></span>
+      <span class="share-card-badge">${escapeHtml(status)}</span>
+    </div>
+    <div class="share-card-order-no">Order ${escapeHtml(o.order_number)}</div>
+    <div class="share-card-product">
+      <span class="share-card-emoji">${escapeHtml(o.product_emoji || '🎁')}</span>
+      <div>
+        <div class="share-card-product-name">${escapeHtml(o.product_name)}</div>
+        <div class="share-card-qty">Qty ${Number(o.quantity)} × ₹${Number(o.unit_price || 0).toFixed(2)}</div>
+      </div>
+    </div>
+    <div class="share-card-total-row">
+      <span>Total</span><span class="share-card-total">₹${Number(o.line_total || 0).toFixed(2)}</span>
+    </div>
+    <div class="share-card-divider"></div>
+    <div class="share-card-row"><span>Customer</span><span>${escapeHtml(o.customer_name)}</span></div>
+    <div class="share-card-row"><span>Shipping to</span><span>${escapeHtml(o.shipping_address || 'N/A')}</span></div>
+    ${trackingRow}
+    <div class="share-card-footer">Thank you for shopping with ${escapeHtml(currentProvider ? currentProvider.name : 'us')}!</div>
+  `;
+}
+
+async function shareOrderPreviewImage() {
+  const o = allOrders.find(order => String(order.id) === String(currentOverviewOrderItemId));
+  if (!o) return;
+  if (typeof html2canvas === 'undefined') {
+    showToast('Image sharing library failed to load — check your connection and try again.', 'error');
+    return;
+  }
+
+  const status = o.fulfillment_status || o.legacy_status;
+
+  // Render off-screen so the user never sees the raw card being built.
+  const renderHost = document.createElement('div');
+  renderHost.className = 'share-card';
+  renderHost.style.position = 'fixed';
+  renderHost.style.left = '-9999px';
+  renderHost.style.top = '0';
+  renderHost.innerHTML = buildShareCardHtml(o, status);
+  document.body.appendChild(renderHost);
+
+  try {
+    const canvas = await html2canvas(renderHost, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+    document.body.removeChild(renderHost);
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        showToast('Could not generate the preview image.', 'error');
+        return;
+      }
+      const file = new File([blob], `order-${o.order_number}.png`, { type: 'image/png' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `Order ${o.order_number}`,
+            text: `Order preview for ${o.order_number}`
+          });
+        } catch (shareErr) {
+          if (shareErr.name !== 'AbortError') {
+            showToast('Could not open the share sheet.', 'error');
+          }
+        }
+        return;
+      }
+
+      // Fallback: device/browser can't share files directly (typical on
+      // desktop). Download the image and open the customer's chat so the
+      // provider just has to attach the file that was just downloaded.
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `order-${o.order_number}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+
+      const chatLink = buildWhatsAppLink(o.customer_phone);
+      if (chatLink) {
+        showToast('Image downloaded — opening the customer\'s chat so you can attach it.');
+        window.open(chatLink, '_blank', 'noopener,noreferrer');
+      } else {
+        showToast('Image downloaded — attach it to the customer\'s chat manually.');
+      }
+    }, 'image/png');
+  } catch (err) {
+    if (renderHost.parentNode) document.body.removeChild(renderHost);
+    showToast(`Could not generate the preview image: ${err.message}`, 'error');
+  }
+}
+
 // Tracks which order item the overview modal is currently showing, so
 // saveOrderTracking() knows what to update without re-parsing the DOM.
 let currentOverviewOrderItemId = null;
