@@ -41,11 +41,14 @@ function escapeHtml(value) {
 // separators), so we strip everything else out here. Returns null when
 // there's nothing usable to link to, so callers can skip rendering the
 // icon entirely instead of pointing it at a dead/empty chat link.
-function buildWhatsAppLink(rawPhone) {
+// An optional `text` is URL-encoded and pre-filled into the chat box —
+// used to share the order preview straight to the customer.
+function buildWhatsAppLink(rawPhone, text) {
   if (!rawPhone) return null;
   const digits = String(rawPhone).replace(/\D/g, '');
   if (!digits) return null;
-  return `https://wa.me/${digits}`;
+  const base = `https://wa.me/${digits}`;
+  return text ? `${base}?text=${encodeURIComponent(text)}` : base;
 }
 
 // Builds a tel:<digits> link from a raw shipping phone number, for the
@@ -56,6 +59,32 @@ function buildCallLink(rawPhone) {
   const digits = String(rawPhone).replace(/[^\d+]/g, '');
   if (!digits) return null;
   return `tel:${digits}`;
+}
+
+// Builds a standard `upi://pay` deep link so tapping the GPay/PhonePe
+// button on an order opens the customer's installed UPI app with the
+// provider's mobile number, the order amount, and a short note already
+// filled in — ready to send, not just "app opens to a blank pay screen".
+//
+// NOTE: UPI's `pa` (payee address) parameter is technically a VPA, not a
+// raw phone number. Most UPI apps do resolve a registered mobile number
+// here and route to that user's linked account, but if a provider's
+// number isn't itself UPI-registered the app will simply fail to find a
+// payee — there's no way to detect that from the browser side. The fix
+// on the provider's end is to enter their UPI-linked number (or an actual
+// VPA, e.g. `9999999999@okhdfcbank`) in Settings.
+function buildUpiLink(providerMobile, amount, payeeName, note) {
+  if (!providerMobile) return null;
+  const pa = String(providerMobile).replace(/\D/g, '');
+  if (!pa) return null;
+  const params = new URLSearchParams({
+    pa,
+    pn: payeeName || 'Doodle G Provider',
+    am: Number(amount || 0).toFixed(2),
+    cu: 'INR',
+    tn: note || 'Order payment'
+  });
+  return `upi://pay?${params.toString()}`;
 }
 
 // Products at or below this remaining quantity are flagged as "low stock"
@@ -416,6 +445,7 @@ async function loadProviderProfile(providerId, email) {
     document.getElementById('set-biz-name').value = currentProvider.name;
     document.getElementById('set-instagram').value = currentProvider.instagram_handle || '';
     document.getElementById('set-email').value = email;
+    document.getElementById('set-upi-mobile').value = currentProvider.payment_mobile_number || '';
     document.getElementById('set-avatar').value = currentProvider.avatar_url || '';
     document.getElementById('set-bio').value = currentProvider.bio || '';
     setupPiiField('set-aadhaar', currentProvider.aadhaar_last4 || '');
@@ -1095,6 +1125,44 @@ function openOrderOverview(orderItemId) {
     mapAnchor.style.display = 'none';
   }
 
+  // --- Share order preview on WhatsApp ---
+  const shareMessage =
+    `*Order Preview — ${o.order_number}*\n` +
+    `${o.product_emoji || '🎁'} ${o.product_name}\n` +
+    `Qty: ${Number(o.quantity)}  |  Total: ₹${Number(o.line_total || 0).toFixed(2)}\n` +
+    `Status: ${status}\n` +
+    (o.tracking_number ? `Tracking: ${o.tracking_number}\n` : '') +
+    `Shipping to: ${o.shipping_address || 'N/A'}`;
+  const shareLink = buildWhatsAppLink(o.customer_phone, shareMessage);
+  const shareBtn = document.getElementById('ov-share-whatsapp');
+  if (shareLink) {
+    shareBtn.href = shareLink;
+    shareBtn.classList.remove('hidden');
+  } else {
+    shareBtn.classList.add('hidden');
+  }
+
+  // --- GPay / PhonePe one-tap payment request ---
+  const providerMobile = currentProvider ? currentProvider.payment_mobile_number : null;
+  const upiNote = `Order ${o.order_number} - ${o.product_name}`;
+  const upiLink = buildUpiLink(providerMobile, o.line_total, currentProvider ? currentProvider.name : null, upiNote);
+  const gpayBtn = document.getElementById('ov-pay-gpay');
+  const phonepeBtn = document.getElementById('ov-pay-phonepe');
+  const paymentNote = document.getElementById('ov-payment-note');
+  if (upiLink) {
+    gpayBtn.href = upiLink;
+    phonepeBtn.href = upiLink;
+    gpayBtn.classList.remove('disabled');
+    phonepeBtn.classList.remove('disabled');
+    paymentNote.classList.add('hidden');
+  } else {
+    gpayBtn.removeAttribute('href');
+    phonepeBtn.removeAttribute('href');
+    gpayBtn.classList.add('disabled');
+    phonepeBtn.classList.add('disabled');
+    paymentNote.classList.remove('hidden');
+  }
+
   document.getElementById('order-overview-modal').classList.remove('hidden');
   if (window.lucide) lucide.createIcons();
 
@@ -1372,6 +1440,7 @@ settingsForm.addEventListener('submit', async (e) => {
   const instagram = document.getElementById('set-instagram').value;
   const avatar = document.getElementById('set-avatar').value;
   const bio = document.getElementById('set-bio').value;
+  const upiMobile = document.getElementById('set-upi-mobile').value;
 
   // Aadhaar/PAN: the DB never gives us the full value back (see
   // setupPiiField above), so there's nothing to silently resend on every
@@ -1385,7 +1454,8 @@ settingsForm.addEventListener('submit', async (e) => {
     name: bizName,
     instagram_handle: instagram || null,
     avatar_url: avatar || null,
-    bio: bio || null
+    bio: bio || null,
+    payment_mobile_number: upiMobile ? upiMobile.replace(/\D/g, '') : null
   };
   if (aadhaarInput.dataset.editing === 'true' && aadhaarInput.value.trim()) {
     updates.aadhaar_number = aadhaarInput.value.trim().replace(/[\s-]/g, '');
