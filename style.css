@@ -1352,10 +1352,10 @@ textarea:focus {
   height: 16px;
 }
 
-/* SHARE ORDER PREVIEW (text to WhatsApp / image to any share target) */
+/* SHARE ORDER PREVIEW (combined image + text, shared together to any target) */
 .share-buttons-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
   margin-bottom: 8px;
 }
@@ -1528,6 +1528,36 @@ textarea:focus {
   margin-top: 18px;
   text-align: center;
   font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.share-card-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.share-card-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.share-card-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+}
+
+.share-card-history-time {
   color: var(--text-muted);
 }
 
@@ -1828,3 +1858,4 @@ textarea:focus {
     display: none;
   }
 }
+
