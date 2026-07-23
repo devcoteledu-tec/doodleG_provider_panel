@@ -1068,24 +1068,46 @@ function buildMapsLink(address) {
 }
 
 // ---------------------------------------------------------------------------
-// Share the order preview as an actual image (not just text) — renders a
-// clean, receipt-style card off-screen with html2canvas, then hands the
-// resulting PNG to the Web Share API so the provider can pick WhatsApp (or
-// anything else) from their device's native share sheet.
+// Share the order preview as ONE combined action: a full-preview image
+// (order details + shipping address + estimated delivery + status history)
+// rendered off-screen with html2canvas, shared together with a text
+// message (which also carries the payment link, since a link can't be
+// tapped inside an image) via a single navigator.share() call. This
+// replaces the old separate "Share as Text" / "Share as Image" buttons —
+// on any device that supports the Web Share API's file-sharing, the
+// image and text go out together in one share sheet action.
 //
-// LIMITATION, called out rather than hidden: unlike the "Share as Text"
-// button (which uses wa.me and opens the customer's exact chat), there is
-// no web API that opens WhatsApp straight into a specific contact with a
-// file already attached — only wa.me's text pre-fill can target a chat
-// directly. Once WhatsApp is chosen from the share sheet, the provider
-// still picks the customer's chat themselves (one extra tap). On desktop
-// browsers without file-sharing support, this instead downloads the image
-// and opens the customer's chat in a new tab so it's ready to attach.
+// LIMITATION, called out rather than hidden: there is no web API that
+// opens WhatsApp straight into a specific contact with a file already
+// attached — only wa.me's text pre-fill can target a chat directly, and
+// that can't carry a file. Once WhatsApp (or any app) is chosen from the
+// share sheet, the provider still picks the customer's chat themselves
+// (one extra tap). On desktop browsers without file-sharing support, this
+// instead downloads the image and opens the customer's chat with the text
+// (including the payment link) pre-filled, ready to attach the image to.
 // ---------------------------------------------------------------------------
-function buildShareCardHtml(o, status) {
+function buildShareCardHtml(o, status, history) {
   const trackingRow = o.tracking_number
     ? `<div class="share-card-row"><span>Tracking</span><span>${escapeHtml(o.tracking_number)}</span></div>`
     : '';
+  const deliveryRow = o.estimated_delivery
+    ? `<div class="share-card-row"><span>Estimated delivery</span><span>${escapeHtml(new Date(o.estimated_delivery).toLocaleDateString())}</span></div>`
+    : '';
+
+  const historyItems = (history || []).map(h => `
+    <li class="share-card-history-item">
+      <span class="badge-status ${escapeHtml(h.status)}">${escapeHtml(h.status)}</span>
+      <span class="share-card-history-time">${escapeHtml(new Date(h.changed_at).toLocaleString())}</span>
+    </li>
+  `).join('');
+  const historySection = historyItems
+    ? `
+      <div class="share-card-divider"></div>
+      <div class="share-card-section-title">Status History</div>
+      <ul class="share-card-history-list">${historyItems}</ul>
+    `
+    : '';
+
   return `
     <div class="share-card-header">
       <span class="share-card-logo">doodle <b>G</b></span>
@@ -1106,11 +1128,30 @@ function buildShareCardHtml(o, status) {
     <div class="share-card-row"><span>Customer</span><span>${escapeHtml(o.customer_name)}</span></div>
     <div class="share-card-row"><span>Shipping to</span><span>${escapeHtml(o.shipping_address || 'N/A')}</span></div>
     ${trackingRow}
+    ${deliveryRow}
+    ${historySection}
     <div class="share-card-footer">Thank you for shopping with ${escapeHtml(currentProvider ? currentProvider.name : 'us')}!</div>
   `;
 }
 
-async function shareOrderPreviewImage() {
+// Builds the text message that goes alongside the shared image. Carries
+// everything a link/plain-text channel needs that an image can't offer on
+// its own — most importantly the tappable UPI payment link.
+function buildShareText(o, status, upiLink) {
+  const lines = [
+    `*Order Preview — ${o.order_number}*`,
+    `${o.product_emoji || '🎁'} ${o.product_name}`,
+    `Qty: ${Number(o.quantity)}  |  Total: ₹${Number(o.line_total || 0).toFixed(2)}`,
+    `Status: ${status}`
+  ];
+  if (o.tracking_number) lines.push(`Tracking: ${o.tracking_number}`);
+  if (o.estimated_delivery) lines.push(`Estimated delivery: ${new Date(o.estimated_delivery).toLocaleDateString()}`);
+  lines.push(`Shipping to: ${o.shipping_address || 'N/A'}`);
+  if (upiLink) lines.push(`Pay now: ${upiLink}`);
+  return lines.join('\n');
+}
+
+async function shareOrderPreviewCombined() {
   const o = allOrders.find(order => String(order.id) === String(currentOverviewOrderItemId));
   if (!o) return;
   if (typeof html2canvas === 'undefined') {
@@ -1119,14 +1160,21 @@ async function shareOrderPreviewImage() {
   }
 
   const status = o.fulfillment_status || o.legacy_status;
+  const providerMobile = currentProvider ? currentProvider.payment_mobile_number : null;
+  const upiNote = `Order ${o.order_number} - ${o.product_name}`;
+  const upiLink = buildUpiLink(providerMobile, o.line_total, currentProvider ? currentProvider.name : null, upiNote);
+  const shareText = buildShareText(o, status, upiLink);
 
   // Render off-screen so the user never sees the raw card being built.
+  // This is the full order preview — header, product, totals, shipping
+  // address, tracking/estimated delivery, and status history all in one
+  // screenshot-style card — captured exactly as it will be shared.
   const renderHost = document.createElement('div');
   renderHost.className = 'share-card';
   renderHost.style.position = 'fixed';
   renderHost.style.left = '-9999px';
   renderHost.style.top = '0';
-  renderHost.innerHTML = buildShareCardHtml(o, status);
+  renderHost.innerHTML = buildShareCardHtml(o, status, currentOverviewHistory);
   document.body.appendChild(renderHost);
 
   try {
@@ -1142,10 +1190,12 @@ async function shareOrderPreviewImage() {
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
+          // Single share action: image + text (with the payment link) go
+          // out together to whatever the provider picks from the sheet.
           await navigator.share({
             files: [file],
             title: `Order ${o.order_number}`,
-            text: `Order preview for ${o.order_number}`
+            text: shareText
           });
         } catch (shareErr) {
           if (shareErr.name !== 'AbortError') {
@@ -1156,8 +1206,9 @@ async function shareOrderPreviewImage() {
       }
 
       // Fallback: device/browser can't share files directly (typical on
-      // desktop). Download the image and open the customer's chat so the
-      // provider just has to attach the file that was just downloaded.
+      // desktop). Download the image and open the customer's chat with the
+      // text (including the payment link) pre-filled, ready to attach the
+      // image that was just downloaded.
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
@@ -1167,9 +1218,9 @@ async function shareOrderPreviewImage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
 
-      const chatLink = buildWhatsAppLink(o.customer_phone);
+      const chatLink = buildWhatsAppLink(o.customer_phone, shareText);
       if (chatLink) {
-        showToast('Image downloaded — opening the customer\'s chat so you can attach it.');
+        showToast('Image downloaded — opening the customer\'s chat with the details so you can attach it.');
         window.open(chatLink, '_blank', 'noopener,noreferrer');
       } else {
         showToast('Image downloaded — attach it to the customer\'s chat manually.');
@@ -1184,6 +1235,12 @@ async function shareOrderPreviewImage() {
 // Tracks which order item the overview modal is currently showing, so
 // saveOrderTracking() knows what to update without re-parsing the DOM.
 let currentOverviewOrderItemId = null;
+
+// Cache of the status-history rows for whichever order the overview modal
+// currently has open (populated by loadOrderHistory below). Kept around so
+// shareOrderPreviewCombined() can drop the same history into the shared
+// image/text without firing a second query for data we already have.
+let currentOverviewHistory = [];
 
 function openOrderOverview(orderItemId) {
   const o = allOrders.find(order => String(order.id) === String(orderItemId));
@@ -1237,23 +1294,6 @@ function openOrderOverview(orderItemId) {
   } else {
     mapAnchor.removeAttribute('href');
     mapAnchor.style.display = 'none';
-  }
-
-  // --- Share order preview on WhatsApp ---
-  const shareMessage =
-    `*Order Preview — ${o.order_number}*\n` +
-    `${o.product_emoji || '🎁'} ${o.product_name}\n` +
-    `Qty: ${Number(o.quantity)}  |  Total: ₹${Number(o.line_total || 0).toFixed(2)}\n` +
-    `Status: ${status}\n` +
-    (o.tracking_number ? `Tracking: ${o.tracking_number}\n` : '') +
-    `Shipping to: ${o.shipping_address || 'N/A'}`;
-  const shareLink = buildWhatsAppLink(o.customer_phone, shareMessage);
-  const shareBtn = document.getElementById('ov-share-whatsapp');
-  if (shareLink) {
-    shareBtn.href = shareLink;
-    shareBtn.classList.remove('hidden');
-  } else {
-    shareBtn.classList.add('hidden');
   }
 
   // --- GPay / PhonePe one-tap payment request ---
@@ -1315,6 +1355,7 @@ async function saveOrderTracking() {
 async function loadOrderHistory(orderItemId) {
   const list = document.getElementById('ov-history-list');
   list.innerHTML = `<li class="text-muted">Loading history...</li>`;
+  currentOverviewHistory = [];
 
   try {
     const { data, error } = await supabaseClient
@@ -1333,6 +1374,8 @@ async function loadOrderHistory(orderItemId) {
       list.innerHTML = `<li class="text-muted">No history recorded yet.</li>`;
       return;
     }
+
+    currentOverviewHistory = data;
 
     list.innerHTML = data.map(h => `
       <li>
@@ -1703,3 +1746,4 @@ function updateDashboardStats() {
     topProductsList.appendChild(li);
   });
 }
+
