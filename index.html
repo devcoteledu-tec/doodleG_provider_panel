@@ -142,6 +142,7 @@
           <button class="nav-item" data-tab="orders">
             <i data-lucide="shopping-cart"></i>
             <span>Order Items</span>
+            <span id="orders-pending-badge" class="nav-badge hidden">0</span>
           </button>
           <button class="nav-item" data-tab="settings">
             <i data-lucide="settings"></i>
@@ -241,6 +242,24 @@
               </div>
             </div>
 
+            <!-- Quick Insights -->
+            <div class="insights-strip">
+              <div class="insight-pill">
+                <i data-lucide="trending-up"></i>
+                <div>
+                  <span class="insight-label">Avg. Order Value</span>
+                  <span id="stat-aov" class="insight-value">₹0.00</span>
+                </div>
+              </div>
+              <div class="insight-pill">
+                <i data-lucide="clock"></i>
+                <div>
+                  <span class="insight-label">Needs Your Action</span>
+                  <span id="stat-pending" class="insight-value">0</span>
+                </div>
+              </div>
+            </div>
+
             <!-- Revenue Trend -->
             <div class="card">
               <div class="card-header">
@@ -281,16 +300,30 @@
                 </div>
               </div>
 
-              <!-- Top Products -->
-              <div class="card">
-                <div class="card-header">
-                  <h2>Top Products</h2>
-                  <button onclick="switchTab('products')" class="btn-text">Manage</button>
+              <!-- Top Products + Low Stock Alerts -->
+              <div class="dashboard-side-col">
+                <div class="card">
+                  <div class="card-header">
+                    <h2>Top Products</h2>
+                    <button onclick="switchTab('products')" class="btn-text">Manage</button>
+                  </div>
+                  <div class="card-body">
+                    <ul id="top-products-list" class="list-unstyled">
+                      <li class="text-muted text-center py-4">No products yet.</li>
+                    </ul>
+                  </div>
                 </div>
-                <div class="card-body">
-                  <ul id="top-products-list" class="list-unstyled">
-                    <li class="text-muted text-center py-4">No products yet.</li>
-                  </ul>
+
+                <div class="card">
+                  <div class="card-header">
+                    <h2>Low Stock Alerts</h2>
+                    <span class="badge-status warning">Restock</span>
+                  </div>
+                  <div class="card-body">
+                    <ul id="low-stock-list" class="list-unstyled">
+                      <li class="text-muted text-center py-4">All products are well stocked.</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -371,7 +404,7 @@
               </div>
               <div class="card-body">
                 <div class="table-responsive">
-                  <table class="data-table">
+                  <table class="data-table orders-table">
                     <thead>
                       <tr>
                         <th>Order Number</th>
@@ -397,6 +430,20 @@
 
           <!-- TAB: SETTINGS -->
           <div id="tab-settings" class="tab-content hidden">
+            <div class="card settings-profile-card">
+              <div class="provider-profile-summary">
+                <img id="provider-avatar-settings" src="https://api.dicebear.com/7.x/initials/svg?seed=Store" alt="Provider Logo">
+                <div class="profile-info">
+                  <h4 id="provider-display-name-settings">Store Name</h4>
+                  <p id="provider-display-email-settings">provider@doodleg.com</p>
+                </div>
+              </div>
+              <button onclick="handleLogout()" class="btn btn-logout settings-logout-btn">
+                <i data-lucide="log-out"></i>
+                <span>Logout</span>
+              </button>
+            </div>
+
             <div class="card">
               <div class="card-header">
                 <h2>Store Information & Details</h2>
