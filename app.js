@@ -905,6 +905,8 @@ function renderOrders(ordersList = allOrders) {
 
   ordersList.forEach(o => {
     const tr = document.createElement('tr');
+    tr.className = 'order-row';
+    tr.dataset.orderRowId = o.id;
     const status = o.fulfillment_status || o.legacy_status;
     const waLink = buildWhatsAppLink(o.customer_phone);
     const callLink = buildCallLink(o.customer_phone);
@@ -957,6 +959,77 @@ document.getElementById('orders-list').addEventListener('change', (e) => {
   if (!select) return;
   updateOrderStatus(select.dataset.orderItemId, select.value);
 });
+
+// Clicking anywhere on an order row opens its overview modal — except
+// clicks on the status dropdown or the call/WhatsApp connect icons,
+// which have their own behavior and shouldn't also pop the modal.
+document.getElementById('orders-list').addEventListener('click', (e) => {
+  if (e.target.closest('select, a')) return;
+  const row = e.target.closest('.order-row');
+  if (!row) return;
+  openOrderOverview(row.dataset.orderRowId);
+});
+
+// Builds a Google Maps search link for a shipping address so clicking the
+// map preview in the order overview takes the provider straight to it.
+function buildMapsLink(address) {
+  if (!address) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
+
+function openOrderOverview(orderItemId) {
+  const o = allOrders.find(order => String(order.id) === String(orderItemId));
+  if (!o) return;
+
+  const status = o.fulfillment_status || o.legacy_status;
+  const waLink = buildWhatsAppLink(o.customer_phone);
+  const callLink = buildCallLink(o.customer_phone);
+
+  document.getElementById('ov-order-number').textContent = o.order_number;
+  document.getElementById('ov-status').innerHTML =
+    `<span class="badge-status ${escapeHtml(status)}">${escapeHtml(status)}</span>`;
+  document.getElementById('ov-customer-name').textContent = o.customer_name;
+  document.getElementById('ov-customer-email').textContent = o.customer_email;
+  document.getElementById('ov-product').textContent =
+    `${o.product_emoji || '🎁'} ${o.product_name}`;
+  document.getElementById('ov-quantity').textContent = Number(o.quantity);
+  document.getElementById('ov-unit-price').textContent = `₹${Number(o.unit_price || 0).toFixed(2)}`;
+  document.getElementById('ov-total').textContent = `₹${Number(o.line_total || 0).toFixed(2)}`;
+  document.getElementById('ov-address').textContent = o.shipping_address || 'No address on file';
+
+  const connectEl = document.getElementById('ov-connect');
+  const parts = [];
+  if (callLink) {
+    parts.push(`<a href="${escapeHtml(callLink)}" title="Call customer" style="display:inline-flex; align-items:center; gap:6px;">
+      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRxz80Nlo85SdDHUxBrSp69uQi5tzk0dmZu4XIk8IGVHw&s=10" alt="Call" width="18" height="18" style="border-radius:3px;">
+    </a>`);
+  }
+  if (waLink) {
+    parts.push(`<a href="${escapeHtml(waLink)}" target="_blank" rel="noopener noreferrer" title="Chat on WhatsApp" style="display:inline-flex; align-items:center; gap:6px;">
+      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTvg2MbImmMcal8qKmgenlQd_How3sCXGLHVEDbqA1Lwg&s=10" alt="WhatsApp" width="18" height="18" style="border-radius:3px;">
+    </a>`);
+  }
+  connectEl.innerHTML = parts.length
+    ? `<span class="overview-label">Connect</span><span style="display:flex; gap:10px;">${parts.join('')}</span>`
+    : '';
+
+  const mapLink = buildMapsLink(o.shipping_address);
+  const mapAnchor = document.getElementById('ov-map-link');
+  if (mapLink) {
+    mapAnchor.href = mapLink;
+    mapAnchor.style.display = 'flex';
+  } else {
+    mapAnchor.removeAttribute('href');
+    mapAnchor.style.display = 'none';
+  }
+
+  document.getElementById('order-overview-modal').classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeOrderOverviewModal() {
+  document.getElementById('order-overview-modal').classList.add('hidden');
+}
 
 function renderRecentOrders() {
   const list = document.getElementById('recent-orders-list');
