@@ -645,16 +645,12 @@
         <div class="overview-section">
           <h3>Share &amp; Collect Payment</h3>
           <div class="share-buttons-row">
-            <a id="ov-share-whatsapp" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary share-whatsapp-btn whatsapp-accent">
-              <i data-lucide="message-circle"></i>
-              <span>Share as Text</span>
-            </a>
-            <button type="button" id="ov-share-image-btn" onclick="shareOrderPreviewImage()" class="btn btn-secondary share-whatsapp-btn">
-              <i data-lucide="image"></i>
-              <span>Share as Image</span>
+            <button type="button" id="ov-share-combined-btn" onclick="shareOrderPreviewCombined()" class="btn btn-secondary share-whatsapp-btn whatsapp-accent full-width">
+              <i data-lucide="share-2"></i>
+              <span>Share Order Preview</span>
             </button>
           </div>
-          <small class="help-text">"Share as Image" sends the exact order preview card (like a receipt) — pick WhatsApp from the share sheet, or it downloads the image if your device/browser can't share files directly.</small>
+          <small class="help-text">Shares one full-preview image (order details, shipping address, estimated delivery, and status history) together with a text message that includes the payment link — pick WhatsApp (or any app) from the share sheet. On devices/browsers that can't share files directly, the image downloads and the customer's chat opens with the text ready to send.</small>
           <div class="payment-buttons-row" style="margin-top: 14px;">
             <a id="ov-pay-gpay" href="#" class="payment-btn" title="Request payment via Google Pay">
               <img src="https://i.pinimg.com/564x/67/28/d8/6728d8f618ff531833c69bd830569376.jpg" alt="Google Pay">
