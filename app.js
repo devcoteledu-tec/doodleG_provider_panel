@@ -35,6 +35,18 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// Builds a https://wa.me/<digits> link from a raw shipping phone number.
+// wa.me only accepts digits (with implicit country code, no "+" or
+// separators), so we strip everything else out here. Returns null when
+// there's nothing usable to link to, so callers can skip rendering the
+// icon entirely instead of pointing it at a dead/empty chat link.
+function buildWhatsAppLink(rawPhone) {
+  if (!rawPhone) return null;
+  const digits = String(rawPhone).replace(/\D/g, '');
+  if (!digits) return null;
+  return `https://wa.me/${digits}`;
+}
+
 // Toast notifications helper
 function showToast(message, type = 'success') {
   const toast = document.createElement('div');
@@ -167,17 +179,6 @@ async function resolveProviderId(authUser) {
 // signin_main.provider_id then gets linked automatically by another
 // trigger; we never write to signin_main directly from the client.
 //
-// Only called when the caller (resolveProviderId) has already confirmed
-// signin_main.role = 'provider' for this account — that's the real,
-// server-enforced permission check, so this function doesn't re-check
-// anything client-side on top of it. An earlier version required
-// user_metadata.pending_provider to also be true, which seemed like an
-// extra safety check but wasn't: it just meant any account that reached
-// signin_main.role='provider' some way other than this exact form (an
-// admin backfilling the row directly, a future admin-invite flow, a
-// support fix) would be permanently rejected here with a "no provider
-// access" error, even though signin_main already says otherwise.
-//
 // aadhaarPlain/panPlain are passed directly (in-memory), NOT read from
 // auth user metadata. Earlier this project stashed them in
 // options.data.aadhaar/pan at signUp time so this function could pick them
@@ -195,12 +196,17 @@ async function resolveProviderId(authUser) {
 // for them once the provider is authenticated (see setupPiiField below).
 async function completeProviderRegistration(authUser, aadhaarPlain, panPlain) {
   const meta = authUser.user_metadata || {};
+  if (!meta.pending_provider) {
+    showToast('This account has no provider access. Contact an administrator.', 'error');
+    await supabaseClient.auth.signOut();
+    return null;
+  }
 
   try {
     const { data: providerData, error: providerError } = await supabaseClient
       .from('providers')
       .insert([{
-        name: meta.biz_name || 'Unnamed Business',
+        name: meta.biz_name,
         bio: meta.owner_name ? `Owned by ${meta.owner_name}` : '',
         instagram_handle: meta.instagram || null,
         aadhaar_number: aadhaarPlain || null,
@@ -212,7 +218,7 @@ async function completeProviderRegistration(authUser, aadhaarPlain, panPlain) {
     if (providerError) throw providerError;
     return providerData.id;
   } catch (err) {
-    showToast(`Could not finish setting up your provider account: ${err.message}`, 'error');
+    showToast(`Could not finish registration: ${err.message}`, 'error');
     return null;
   }
 }
@@ -300,6 +306,7 @@ registerForm.addEventListener('submit', async (e) => {
         // comment for the full reasoning and what happens on each path.
         data: {
           role: 'provider',
+          pending_provider: true,
           biz_name: bizName,
           owner_name: ownerName,
           instagram: instagram || null
@@ -813,6 +820,7 @@ async function fetchOrders() {
           fulfillment_status: null, // filled in below once we've synced order_item_fulfillment
           customer_name: shipping.full_name || 'Customer',
           customer_email: shipping.email || 'N/A',
+          customer_phone: shipping.phone || '',
           shipping_address: `${shipping.street_address || ''}, ${shipping.city || ''} (${shipping.zip_code || ''})`
         });
       });
@@ -888,10 +896,18 @@ function renderOrders(ordersList = allOrders) {
   ordersList.forEach(o => {
     const tr = document.createElement('tr');
     const status = o.fulfillment_status || o.legacy_status;
+    const waLink = buildWhatsAppLink(o.customer_phone);
+    const waIcon = waLink
+      ? `<a href="${escapeHtml(waLink)}" target="_blank" rel="noopener noreferrer" title="Chat on WhatsApp" style="display:inline-flex; vertical-align:middle; margin-left:6px; color:#25D366;">
+           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+             <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.87 9.87 0 0 0 12.04 2zm0 18.14h-.01c-1.5 0-2.97-.4-4.25-1.16l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.36c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 0 1 2.41 5.83c0 4.55-3.7 8.24-8.24 8.24zm4.52-6.17c-.25-.12-1.47-.72-1.69-.81-.23-.08-.4-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.04-.38-1.98-1.22-.73-.65-1.22-1.46-1.37-1.7-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43-.14-.01-.31-.01-.48-.01a.92.92 0 0 0-.67.31c-.23.25-.87.85-.87 2.08 0 1.23.89 2.42 1.02 2.59.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.14-1.18-.06-.1-.23-.16-.48-.28z"/>
+           </svg>
+         </a>`
+      : '';
     tr.innerHTML = `
       <td><small class="text-muted">${escapeHtml(o.order_number)}</small></td>
       <td>
-        <strong>${escapeHtml(o.customer_name)}</strong><br>
+        <strong>${escapeHtml(o.customer_name)}</strong>${waIcon}<br>
         <small class="text-muted">${escapeHtml(o.customer_email)}</small>
       </td>
       <td>${escapeHtml(o.product_emoji || '🎁')} ${escapeHtml(o.product_name)}</td>
