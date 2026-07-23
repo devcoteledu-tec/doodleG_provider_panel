@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doodle G - Provider Panel</title>
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@1.25.0"></script>
+  <!-- Supabase JS Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- App Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Notification Toast -->
+  <div id="toast-container"></div>
+
+  <!-- Main Container -->
+  <div id="app-container">
+    
+    <!-- AUTH SECTION -->
+    <div id="auth-section" class="hidden">
+      <div class="auth-card-wrapper">
+        <div class="auth-brand">
+          <div class="logo">doodle <span>G</span></div>
+          <p>Provider Dashboard Portal</p>
+        </div>
+        
+        <div class="auth-tabs">
+          <button class="auth-tab-btn active" onclick="switchAuthTab('login')">Sign In</button>
+          <button class="auth-tab-btn" onclick="switchAuthTab('register')">Register Business</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form" class="auth-form">
+          <div class="form-group">
+            <label for="login-email">Email Address</label>
+            <div class="input-wrapper">
+              <i data-lucide="mail"></i>
+              <input type="email" id="login-email" placeholder="provider@doodleg.com" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <div class="input-wrapper">
+              <i data-lucide="lock"></i>
+              <input type="password" id="login-password" placeholder="••••••••" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary full-width">
+            <span>Sign In to Dashboard</span>
+            <i data-lucide="arrow-right"></i>
+          </button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="register-form" class="auth-form hidden">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="reg-biz-name">Business / Store Name</label>
+              <div class="input-wrapper">
+                <i data-lucide="store"></i>
+                <input type="text" id="reg-biz-name" placeholder="Doodle Gifts Ltd." required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="reg-owner-name">Owner Full Name</label>
+              <div class="input-wrapper">
+                <i data-lucide="user"></i>
+                <input type="text" id="reg-owner-name" placeholder="John Doe" required>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="reg-email">Business Email</label>
+            <div class="input-wrapper">
+              <i data-lucide="mail"></i>
+              <input type="email" id="reg-email" placeholder="contact@doodleg.com" required>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="reg-password">Password</label>
+              <div class="input-wrapper">
+                <i data-lucide="lock"></i>
+                <input type="password" id="reg-password" placeholder="••••••••" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="reg-instagram">Instagram Handle</label>
+              <div class="input-wrapper">
+                <i data-lucide="instagram"></i>
+                <input type="text" id="reg-instagram" placeholder="doodle_g_shop">
+              </div>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="reg-aadhaar">Aadhaar Number</label>
+              <input type="text" id="reg-aadhaar" placeholder="1234-5678-9012">
+            </div>
+            <div class="form-group">
+              <label for="reg-pan">PAN Card Number</label>
+              <input type="text" id="reg-pan" placeholder="ABCDE1234F">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary full-width">
+            <span>Register & Initialize Portal</span>
+            <i data-lucide="check-circle"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- PANEL SECTION (LOGGED IN) -->
+    <div id="panel-section" class="hidden">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="logo">doodle <span>G</span></div>
+          <span class="badge">Provider</span>
+        </div>
+
+        <nav class="nav-menu">
+          <button class="nav-item active" data-tab="dashboard">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Dashboard</span>
+          </button>
+          <button class="nav-item" data-tab="products">
+            <i data-lucide="package"></i>
+            <span>My Products</span>
+          </button>
+          <button class="nav-item" data-tab="followers">
+            <i data-lucide="users"></i>
+            <span>Followers</span>
+          </button>
+          <button class="nav-item" data-tab="orders">
+            <i data-lucide="shopping-cart"></i>
+            <span>Order Items</span>
+          </button>
+          <button class="nav-item" data-tab="settings">
+            <i data-lucide="settings"></i>
+            <span>Store Profile</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="provider-profile-summary">
+            <img id="provider-avatar" src="https://api.dicebear.com/7.x/initials/svg?seed=Store" alt="Provider Logo">
+            <div class="profile-info">
+              <h4 id="provider-display-name">Store Name</h4>
+              <p id="provider-display-email">provider@doodleg.com</p>
+            </div>
+          </div>
+          <button onclick="handleLogout()" class="btn btn-logout">
+            <i data-lucide="log-out"></i>
+            <span>Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="main-content">
+        <!-- Topbar -->
+        <header class="topbar">
+          <div class="header-title">
+            <h1 id="page-title">Dashboard Overview</h1>
+            <p id="page-subtitle" class="text-muted">Welcome back, get an instant health check of your business.</p>
+          </div>
+          <div class="header-actions">
+            <div class="live-indicator">
+              <span class="dot animate-pulse"></span>
+              <span>Live Mode</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- View Content Containers -->
+        <div id="content-area">
+          
+          <!-- TAB: DASHBOARD -->
+          <div id="tab-dashboard" class="tab-content">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon icon-revenue">
+                  <i data-lucide="indian-rupee"></i>
+                </div>
+                <div class="stat-details">
+                  <h3>Total Revenue</h3>
+                  <p id="stat-revenue">₹0.00</p>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon icon-products">
+                  <i data-lucide="package"></i>
+                </div>
+                <div class="stat-details">
+                  <h3>Total Products</h3>
+                  <p id="stat-products">0</p>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon icon-followers">
+                  <i data-lucide="users"></i>
+                </div>
+                <div class="stat-details">
+                  <h3>Followers</h3>
+                  <p id="stat-followers">0</p>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon icon-orders">
+                  <i data-lucide="shopping-bag"></i>
+                </div>
+                <div class="stat-details">
+                  <h3>Orders Fulfilled</h3>
+                  <p id="stat-orders">0</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Charts / Recent Activities Summary Section -->
+            <div class="dashboard-grid">
+              <!-- Recent Orders -->
+              <div class="card col-2">
+                <div class="card-header">
+                  <h2>Recent Order Items</h2>
+                  <button onclick="switchTab('orders')" class="btn-text">View All <i data-lucide="chevron-right"></i></button>
+                </div>
+                <div class="card-body">
+                  <div class="table-responsive">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Order ID</th>
+                          <th>Product</th>
+                          <th>Qty</th>
+                          <th>Total</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody id="recent-orders-list">
+                        <tr>
+                          <td colspan="5" class="text-center py-4 text-muted">No recent orders yet.</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Top Products -->
+              <div class="card">
+                <div class="card-header">
+                  <h2>Top Products</h2>
+                  <button onclick="switchTab('products')" class="btn-text">Manage</button>
+                </div>
+                <div class="card-body">
+                  <ul id="top-products-list" class="list-unstyled">
+                    <li class="text-muted text-center py-4">No products yet.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: PRODUCTS -->
+          <div id="tab-products" class="tab-content hidden">
+            <div class="tab-actions-header">
+              <div class="search-box">
+                <i data-lucide="search"></i>
+                <input type="text" id="product-search" placeholder="Search products..." oninput="filterProducts()">
+              </div>
+              <button onclick="openProductModal()" class="btn btn-primary">
+                <i data-lucide="plus"></i>
+                <span>Add Product</span>
+              </button>
+            </div>
+
+            <div id="products-grid" class="products-grid">
+              <!-- Dynamically Populated -->
+            </div>
+          </div>
+
+          <!-- TAB: FOLLOWERS -->
+          <div id="tab-followers" class="tab-content hidden">
+            <div class="card">
+              <div class="card-header">
+                <h2>Your Loyal Followers</h2>
+                <div class="search-box sm">
+                  <i data-lucide="search"></i>
+                  <input type="text" id="follower-search" placeholder="Filter followers..." oninput="filterFollowers()">
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="table-responsive">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Follower Avatar</th>
+                        <th>Follower Name</th>
+                        <th>Subscribed Date</th>
+                      </tr>
+                    </thead>
+                    <tbody id="followers-list">
+                      <!-- Dynamically Populated -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: ORDERS -->
+          <div id="tab-orders" class="tab-content hidden">
+            <div class="card">
+              <div class="card-header">
+                <h2>Incoming Order Items</h2>
+                <div class="filter-actions">
+                  <select id="order-status-filter" onchange="filterOrders()">
+                    <option value="all">All Statuses</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="table-responsive">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Order Number</th>
+                        <th>Customer Details</th>
+                        <th>Product Info</th>
+                        <th>Quantity</th>
+                        <th>Price/Unit</th>
+                        <th>Total</th>
+                        <th>Shipping Address</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="orders-list">
+                      <!-- Dynamically Populated -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: SETTINGS -->
+          <div id="tab-settings" class="tab-content hidden">
+            <div class="card">
+              <div class="card-header">
+                <h2>Store Information & Details</h2>
+              </div>
+              <div class="card-body">
+                <form id="settings-form">
+                  <div class="form-grid">
+                    <div class="form-group">
+                      <label for="set-biz-name">Business Store Name</label>
+                      <input type="text" id="set-biz-name" required>
+                    </div>
+                    <div class="form-group">
+                      <label for="set-instagram">Instagram Handle</label>
+                      <input type="text" id="set-instagram" placeholder="doodle_g_shop">
+                    </div>
+                  </div>
+                  <div class="form-grid">
+                    <div class="form-group">
+                      <label for="set-email">Contact Email</label>
+                      <input type="email" id="set-email" readonly disabled>
+                      <small class="help-text">Email managed via system authentication settings.</small>
+                    </div>
+                    <div class="form-group">
+                      <label for="set-aadhaar">Aadhaar Number</label>
+                      <div class="sensitive-field-wrapper">
+                        <input type="text" id="set-aadhaar" placeholder="1234-5678-9012">
+                        <button type="button" class="reveal-toggle-btn" onclick="togglePiiFieldEdit('set-aadhaar')" title="Update Aadhaar number">
+                          <i data-lucide="pencil"></i>
+                        </button>
+                      </div>
+                      <small class="help-text">Stored as a secure hash — only the last 4 digits are ever shown again. Click the pencil to replace it.</small>
+                    </div>
+                  </div>
+                  <div class="form-grid">
+                    <div class="form-group">
+                      <label for="set-pan">PAN Card Number</label>
+                      <div class="sensitive-field-wrapper">
+                        <input type="text" id="set-pan" placeholder="ABCDE1234F">
+                        <button type="button" class="reveal-toggle-btn" onclick="togglePiiFieldEdit('set-pan')" title="Update PAN number">
+                          <i data-lucide="pencil"></i>
+                        </button>
+                      </div>
+                      <small class="help-text">Stored as a secure hash — only the last 4 characters are ever shown again. Click the pencil to replace it.</small>
+                    </div>
+                    <div class="form-group">
+                      <label for="set-avatar">Store Avatar/Logo URL</label>
+                      <input type="url" id="set-avatar" placeholder="https://example.com/logo.png">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="set-bio">Store Bio / Description</label>
+                    <textarea id="set-bio" rows="4" placeholder="Tell customers about your shop and the unique gifts you sell..."></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-primary">Save Profile Details</button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+
+  </div>
+
+  <!-- Product Create/Edit Modal -->
+  <div id="product-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="product-modal-title">Add Gift Product</h2>
+        <button onclick="closeProductModal()" class="btn-close">&times;</button>
+      </div>
+      <form id="product-form">
+        <input type="hidden" id="product-id">
+        <div class="form-group">
+          <label for="prod-name">Product Name</label>
+          <input type="text" id="prod-name" required placeholder="e.g. Handmade Personalized Ceramic Mug">
+        </div>
+        <div class="form-group">
+          <label for="prod-description">Description</label>
+          <textarea id="prod-description" rows="3" placeholder="Provide a detailed description of the gift..."></textarea>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="prod-price">Price (₹)</label>
+            <input type="number" id="prod-price" min="0" required placeholder="499">
+          </div>
+          <div class="form-group">
+            <label for="prod-stock">Available Quantity</label>
+            <input type="number" id="prod-stock" min="0" required placeholder="50">
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="prod-category">Category</label>
+            <input type="text" id="prod-category" required placeholder="Mugs, Cards, Toys...">
+          </div>
+          <div class="form-group">
+            <label for="prod-status">Product Label Tag</label>
+            <select id="prod-status">
+              <option value="NEW">NEW</option>
+              <option value="SALE">SALE</option>
+              <option value="HOT">HOT</option>
+              <option value="LIMITED">LIMITED</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Product Images (At least 3, up to 5 URLs separated by commas)</label>
+          <textarea id="prod-images" rows="3" placeholder="https://images.unsplash.com/url1, https://images.unsplash.com/url2, https://images.unsplash.com/url3"></textarea>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="prod-emoji">Emoji Icon</label>
+            <input type="text" id="prod-emoji" value="🎁" placeholder="🎁">
+          </div>
+          <div class="form-group">
+            <label for="prod-gradient">CSS Gradient Class</label>
+            <input type="text" id="prod-gradient" value="from-pink-500 to-rose-500" placeholder="from-pink-500 to-rose-500">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" onclick="closeProductModal()" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Core App Logic -->
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
