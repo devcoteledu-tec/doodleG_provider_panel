@@ -38,6 +38,13 @@
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.12);
   --shadow-glow: 0 0 20px var(--primary-glow);
+
+  /* Vivid per-category gradients for stat icon chips / accents */
+  --grad-revenue: linear-gradient(135deg, #7c3aed, #a855f7);
+  --grad-products: linear-gradient(135deg, #4f46e5, #6366f1);
+  --grad-followers: linear-gradient(135deg, #15803d, #22c55e);
+  --grad-orders: linear-gradient(135deg, #d97706, #f59e0b);
+  --grad-lowstock: linear-gradient(135deg, #dc2626, #f87171);
 }
 
 /* Headings always green, per site-wide brand color */
@@ -647,6 +654,7 @@ textarea:focus {
 }
 
 .stat-card {
+  position: relative;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -654,6 +662,21 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 16px;
+  overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--stat-accent, var(--grad-followers));
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
 }
 
 .stat-icon {
@@ -663,17 +686,23 @@ textarea:focus {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #fff;
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-icon i {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
-.icon-revenue { background-color: rgba(139, 92, 246, 0.1); color: var(--primary); }
-.icon-products { background-color: rgba(99, 102, 241, 0.1); color: #6366f1; }
-.icon-followers { background-color: rgba(16, 185, 129, 0.1); color: var(--success); }
-.icon-orders { background-color: rgba(245, 158, 11, 0.1); color: var(--warning); }
+.icon-revenue { background: var(--grad-revenue); }
+.stat-card:has(.icon-revenue) { --stat-accent: var(--grad-revenue); }
+.icon-products { background: var(--grad-products); }
+.stat-card:has(.icon-products) { --stat-accent: var(--grad-products); }
+.icon-followers { background: var(--grad-followers); }
+.stat-card:has(.icon-followers) { --stat-accent: var(--grad-followers); }
+.icon-orders { background: var(--grad-orders); }
+.stat-card:has(.icon-orders) { --stat-accent: var(--grad-orders); }
 
 .stat-details h3 {
   font-size: 0.85rem;
@@ -691,10 +720,153 @@ textarea:focus {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 24px;
+  align-items: start;
 }
 
 .col-2 {
   grid-column: span 1;
+}
+
+.dashboard-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dashboard-side-col .card {
+  margin-bottom: 0;
+}
+
+/* QUICK INSIGHTS STRIP */
+.insights-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.insight-pill {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.06), rgba(34, 197, 94, 0.03));
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+}
+
+.insight-pill i {
+  width: 20px;
+  height: 20px;
+  color: var(--primary-hover);
+  flex-shrink: 0;
+}
+
+.insight-pill div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.insight-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.insight-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* LOW STOCK ALERTS LIST */
+.low-stock-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.low-stock-item:last-child {
+  border-bottom: none;
+}
+
+.low-stock-item:hover {
+  background-color: var(--bg-surface-elevated);
+}
+
+.low-stock-info h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.low-stock-info p {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.low-stock-qty {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--warning);
+  background-color: var(--warning-bg);
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.low-stock-qty.zero {
+  color: var(--danger);
+  background-color: var(--danger-bg);
+}
+
+/* NAV BADGE (unread / needs-action indicator) */
+.nav-item {
+  position: relative;
+}
+
+.nav-badge {
+  background: var(--grad-orders);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+/* SETTINGS PROFILE HEADER (also the reachable-on-mobile logout point) */
+.settings-profile-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.settings-logout-btn {
+  width: auto;
+  padding: 10px 18px;
+}
+
+/* Order status <select> inside the orders table/cards */
+.table-select {
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  padding: 6px 8px;
 }
 
 /* TABLES */
@@ -741,9 +913,11 @@ textarea:focus {
 }
 
 .badge-status.pending { background-color: var(--warning-bg); color: var(--warning); }
+.badge-status.confirmed { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; }
 .badge-status.processing { background-color: rgba(99, 102, 241, 0.1); color: #818cf8; }
 .badge-status.shipped { background-color: rgba(139, 92, 246, 0.1); color: var(--primary-hover); }
 .badge-status.delivered { background-color: var(--success-bg); color: var(--success); }
+.badge-status.cancelled { background-color: var(--danger-bg); color: var(--danger); }
 
 /* PRODUCTS GRID */
 .tab-actions-header {
@@ -975,7 +1149,10 @@ textarea:focus {
   white-space: nowrap;
 }
 
-.icon-lowstock { background-color: var(--warning-bg); color: var(--warning); }
+.icon-lowstock { background: var(--grad-lowstock); }
+.stat-card:has(.icon-lowstock) { --stat-accent: var(--grad-lowstock); }
+
+.badge-status.warning { background-color: var(--warning-bg); color: var(--warning); }
 
 /* LOW STOCK BADGE on product cards */
 .stock-badge-low {
@@ -1174,7 +1351,7 @@ textarea:focus {
   }
   .sidebar-header .logo,
   .sidebar-header .badge,
-  .nav-item span,
+  .nav-item span:not(.nav-badge),
   .sidebar-footer .profile-info,
   .sidebar-footer button span {
     display: none;
@@ -1182,6 +1359,12 @@ textarea:focus {
   .nav-item {
     justify-content: center;
     padding: 12px;
+  }
+  .nav-item .nav-badge {
+    position: absolute;
+    top: 6px;
+    right: 14px;
+    margin-left: 0;
   }
   .sidebar-footer {
     align-items: center;
@@ -1191,6 +1374,58 @@ textarea:focus {
   }
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  /* The orders table has 10 columns — unusable as a horizontal-scroll
+     table on phones/tablets, so it becomes a stacked card per order
+     line item instead. Each <td> is turned into a labeled row using
+     its data-label attribute (set in renderOrders()). */
+  .orders-table thead {
+    display: none;
+  }
+  .orders-table, .orders-table tbody, .orders-table tr, .orders-table td {
+    display: block;
+    width: 100%;
+  }
+  .orders-table tr {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin-bottom: 14px;
+    padding: 6px 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .orders-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+    text-align: right;
+  }
+  .orders-table td:last-child {
+    border-bottom: none;
+  }
+  .orders-table td::before {
+    content: attr(data-label);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .orders-table td.connect-cell {
+    justify-content: flex-start;
+  }
+  .orders-table td.connect-cell::before {
+    margin-right: auto;
+  }
+  .orders-table .table-select {
+    max-width: 60%;
   }
 }
 
@@ -1213,6 +1448,12 @@ textarea:focus {
   .products-grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 14px;
+  }
+  .product-image {
+    height: 140px;
+  }
+  .product-details {
+    padding: 14px;
   }
   .tab-actions-header {
     flex-direction: column;
@@ -1261,9 +1502,7 @@ textarea:focus {
     z-index: 900;
   }
   .sidebar-header,
-  .sidebar-footer .profile-info,
-  .sidebar-footer .btn-logout span,
-  .sidebar-footer .provider-profile-summary img {
+  .sidebar-footer {
     display: none;
   }
   .nav-menu {
@@ -1286,6 +1525,20 @@ textarea:focus {
     box-shadow: none;
     background-color: var(--success-bg);
     border-radius: var(--radius-sm);
+  }
+  .nav-item .nav-badge {
+    position: absolute;
+    top: 2px;
+    right: 14%;
+    min-width: 15px;
+    height: 15px;
+    font-size: 0.6rem;
+    margin-left: 0;
+  }
+  /* Settings profile card becomes the mobile logout access point since the
+     sidebar footer is hidden in this bottom-nav layout */
+  .settings-profile-card {
+    justify-content: flex-start;
   }
   .sidebar-footer {
     display: flex;
@@ -1360,7 +1613,7 @@ textarea:focus {
   .products-grid {
     grid-template-columns: 1fr;
   }
-  .nav-item span {
+  .nav-item span:not(.nav-badge) {
     display: none;
   }
 }
