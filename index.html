@@ -467,6 +467,13 @@
                       <small class="help-text">Email managed via system authentication settings.</small>
                     </div>
                     <div class="form-group">
+                      <label for="set-upi-mobile">UPI-Linked Mobile Number</label>
+                      <input type="tel" id="set-upi-mobile" placeholder="9876543210">
+                      <small class="help-text">Used to build the Google Pay / PhonePe "pay now" links on each order preview. Must be a mobile number registered for UPI.</small>
+                    </div>
+                  </div>
+                  <div class="form-grid">
+                    <div class="form-group">
                       <label for="set-aadhaar">Aadhaar Number</label>
                       <div class="sensitive-field-wrapper">
                         <input type="text" id="set-aadhaar" placeholder="1234-5678-9012">
@@ -632,6 +639,24 @@
             <span class="overview-label">Total</span>
             <span id="ov-total" class="overview-value"></span>
           </div>
+        </div>
+        <div class="overview-section">
+          <h3>Share &amp; Collect Payment</h3>
+          <a id="ov-share-whatsapp" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary full-width share-whatsapp-btn">
+            <i data-lucide="share-2"></i>
+            <span>Share Order Preview on WhatsApp</span>
+          </a>
+          <div class="payment-buttons-row">
+            <a id="ov-pay-gpay" href="#" class="payment-btn" title="Request payment via Google Pay">
+              <img src="https://i.pinimg.com/564x/67/28/d8/6728d8f618ff531833c69bd830569376.jpg" alt="Google Pay">
+              <span>Google Pay</span>
+            </a>
+            <a id="ov-pay-phonepe" href="#" class="payment-btn" title="Request payment via PhonePe">
+              <img src="https://download.logo.wine/logo/PhonePe/PhonePe-Logo.wine.png" alt="PhonePe">
+              <span>PhonePe</span>
+            </a>
+          </div>
+          <small id="ov-payment-note" class="help-text hidden">Add your UPI-linked mobile number in Settings to enable one-tap payment collection.</small>
         </div>
         <div class="overview-section">
           <h3>Shipping Address</h3>
