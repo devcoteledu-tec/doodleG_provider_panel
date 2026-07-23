@@ -14,8 +14,8 @@
 // unrestricted. It belongs only in a server-side environment (an Edge
 // Function, a backend), never in code that ships to a browser.
 const SUPABASE_CONFIG = {
-  url: 'https://YOUR-PROJECT-REF.supabase.co',
-  anonKey: 'YOUR-ANON-PUBLIC-KEY',
+  url: 'https://vvngwquroiebodvjnoca.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2bmd3cXVyb2llYm9kdmpub2NhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNDY1NjMsImV4cCI6MjA5ODkyMjU2M30.9WvFLFTKUJBCVsoWmSBBaWxEc20wbeItHIwNDztwaAs',
 
   get isConfigured() {
     return Boolean(this.url) && Boolean(this.anonKey)
