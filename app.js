@@ -167,6 +167,17 @@ async function resolveProviderId(authUser) {
 // signin_main.provider_id then gets linked automatically by another
 // trigger; we never write to signin_main directly from the client.
 //
+// Only called when the caller (resolveProviderId) has already confirmed
+// signin_main.role = 'provider' for this account — that's the real,
+// server-enforced permission check, so this function doesn't re-check
+// anything client-side on top of it. An earlier version required
+// user_metadata.pending_provider to also be true, which seemed like an
+// extra safety check but wasn't: it just meant any account that reached
+// signin_main.role='provider' some way other than this exact form (an
+// admin backfilling the row directly, a future admin-invite flow, a
+// support fix) would be permanently rejected here with a "no provider
+// access" error, even though signin_main already says otherwise.
+//
 // aadhaarPlain/panPlain are passed directly (in-memory), NOT read from
 // auth user metadata. Earlier this project stashed them in
 // options.data.aadhaar/pan at signUp time so this function could pick them
@@ -184,17 +195,12 @@ async function resolveProviderId(authUser) {
 // for them once the provider is authenticated (see setupPiiField below).
 async function completeProviderRegistration(authUser, aadhaarPlain, panPlain) {
   const meta = authUser.user_metadata || {};
-  if (!meta.pending_provider) {
-    showToast('This account has no provider access. Contact an administrator.', 'error');
-    await supabaseClient.auth.signOut();
-    return null;
-  }
 
   try {
     const { data: providerData, error: providerError } = await supabaseClient
       .from('providers')
       .insert([{
-        name: meta.biz_name,
+        name: meta.biz_name || 'Unnamed Business',
         bio: meta.owner_name ? `Owned by ${meta.owner_name}` : '',
         instagram_handle: meta.instagram || null,
         aadhaar_number: aadhaarPlain || null,
@@ -206,7 +212,7 @@ async function completeProviderRegistration(authUser, aadhaarPlain, panPlain) {
     if (providerError) throw providerError;
     return providerData.id;
   } catch (err) {
-    showToast(`Could not finish registration: ${err.message}`, 'error');
+    showToast(`Could not finish setting up your provider account: ${err.message}`, 'error');
     return null;
   }
 }
@@ -294,7 +300,6 @@ registerForm.addEventListener('submit', async (e) => {
         // comment for the full reasoning and what happens on each path.
         data: {
           role: 'provider',
-          pending_provider: true,
           biz_name: bizName,
           owner_name: ownerName,
           instagram: instagram || null
