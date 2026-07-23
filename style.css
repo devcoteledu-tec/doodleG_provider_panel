@@ -236,6 +236,7 @@ input[type="password"],
 input[type="url"],
 input[type="number"],
 input[type="tel"],
+input[type="date"],
 select,
 textarea {
   width: 100%;
@@ -627,6 +628,8 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 20px;
 }
 
@@ -928,6 +931,142 @@ textarea:focus {
   color: var(--primary-hover);
 }
 
+/* FILTER ACTIONS (orders/products toolbar row) */
+.filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-actions input[type="date"] {
+  width: auto;
+  padding: 10px 12px;
+}
+
+.filter-actions select {
+  width: auto;
+}
+
+/* PAUSE / HOLIDAY MODE BANNER */
+.pause-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--warning-bg);
+  color: var(--warning);
+  border: 1px solid rgba(180, 83, 9, 0.25);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.pause-banner i {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.pause-banner .btn-text {
+  margin-left: auto;
+  color: var(--warning);
+  white-space: nowrap;
+}
+
+.icon-lowstock { background-color: var(--warning-bg); color: var(--warning); }
+
+/* LOW STOCK BADGE on product cards */
+.stock-badge-low {
+  color: var(--warning);
+  font-weight: 700;
+}
+
+/* REVENUE TREND CHART (simple inline bar chart) */
+.revenue-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 160px;
+  padding-top: 10px;
+  overflow-x: auto;
+}
+
+.revenue-bar-wrap {
+  flex: 1;
+  min-width: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 6px;
+}
+
+.revenue-bar {
+  width: 100%;
+  max-width: 28px;
+  background: linear-gradient(180deg, var(--primary), var(--heading-hover));
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+  transition: all var(--transition-fast);
+}
+
+.revenue-bar-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* REPEAT CUSTOMER BADGE */
+.repeat-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--heading-color);
+  background-color: var(--success-bg);
+  padding: 2px 6px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* ORDER STATUS HISTORY LIST */
+.history-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  padding-left: 16px;
+  position: relative;
+}
+
+.history-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--primary);
+}
+
+.history-list .history-time {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* ORDER ROW (clickable for overview) */
 .order-row {
   cursor: pointer;
@@ -1078,6 +1217,17 @@ textarea:focus {
   .tab-actions-header {
     flex-direction: column;
     align-items: stretch;
+  }
+  .filter-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .filter-actions input[type="date"],
+  .filter-actions select,
+  .filter-actions .search-box.sm {
+    width: 100%;
+    max-width: 100%;
   }
   .search-box, .search-box.sm {
     max-width: 100%;
