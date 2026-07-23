@@ -607,6 +607,98 @@ textarea:focus {
   font-weight: 600;
 }
 
+/* Link out to the customer-facing marketplace, shown in the desktop topbar */
+.btn-visit-store {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-secondary);
+  padding: 8px 14px;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-fast);
+}
+
+.btn-visit-store i {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-visit-store:hover {
+  background-color: var(--success-bg);
+  color: var(--heading-color);
+  border-color: var(--border-glow);
+}
+
+/* MOBILE TOPBAR
+   Hidden by default (desktop uses the .sidebar + .topbar layout). Shown
+   only at the same breakpoint where .sidebar turns into a bottom nav bar,
+   so provider branding, quick search and profile access stay reachable
+   at the top of the screen on phones. */
+.mobile-topbar {
+  display: none;
+}
+
+.mobile-topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-topbar-brand .logo {
+  font-size: 1.35rem;
+}
+
+.mobile-topbar-brand .badge {
+  white-space: nowrap;
+}
+
+.mobile-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-topbar-actions .icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.mobile-topbar-actions .icon-btn i {
+  width: 20px;
+  height: 20px;
+}
+
+.mobile-topbar-actions .icon-btn:hover,
+.mobile-topbar-actions .icon-btn:active {
+  background-color: var(--bg-surface-elevated);
+  color: var(--heading-color);
+}
+
+.mobile-topbar-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  background-color: var(--bg-base);
+  cursor: pointer;
+  object-fit: cover;
+}
+
 .live-indicator .dot {
   width: 8px;
   height: 8px;
@@ -1714,6 +1806,25 @@ textarea:focus {
   .modal-overlay {
     padding: 10px;
   }
+  /* Reveal the branded mobile topbar (sidebar becomes a bottom nav below,
+     so this is now the only place showing "doodle G Provider" + quick
+     actions on phones). */
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 950;
+    background-color: var(--bg-surface);
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 16px;
+  }
+  /* The desktop "Visit Main Site" pill is replaced by the mobile topbar's
+     external-link icon, so hide it here to avoid duplicating the action. */
+  .btn-visit-store {
+    display: none;
+  }
   .sidebar {
     position: fixed;
     bottom: 0;
@@ -1857,5 +1968,13 @@ textarea:focus {
   .nav-item span:not(.nav-badge) {
     display: none;
   }
+  .mobile-topbar-brand .badge {
+    display: none;
+  }
+  .mobile-topbar-brand .logo {
+    font-size: 1.15rem;
+  }
+  .mobile-topbar-actions {
+    gap: 4px;
+  }
 }
-
