@@ -66,25 +66,23 @@ function buildCallLink(rawPhone) {
 // provider's mobile number, the order amount, and a short note already
 // filled in — ready to send, not just "app opens to a blank pay screen".
 //
-// NOTE: UPI's `pa` (payee address) parameter is technically a VPA, not a
-// raw phone number. Most UPI apps do resolve a registered mobile number
-// here and route to that user's linked account, but if a provider's
-// number isn't itself UPI-registered the app will simply fail to find a
+// The `pa` (payee address) parameter needs to be a real VPA, not a bare
+// phone number, so the provider's UPI-linked mobile number is suffixed
+// with `@ybl` (PhonePe's handle — most Indian mobile numbers registered
+// for UPI resolve through it). If a provider's number isn't itself
+// UPI-registered under that handle, the app will simply fail to find a
 // payee — there's no way to detect that from the browser side. The fix
-// on the provider's end is to enter their UPI-linked number (or an actual
-// VPA, e.g. `9999999999@okhdfcbank`) in Settings.
+// on the provider's end is to double check the UPI-linked mobile number
+// entered in Settings.
 function buildUpiLink(providerMobile, amount, payeeName, note) {
   if (!providerMobile) return null;
-  const pa = String(providerMobile).replace(/\D/g, '');
-  if (!pa) return null;
-  const params = new URLSearchParams({
-    pa,
-    pn: payeeName || 'Doodle G Provider',
-    am: Number(amount || 0).toFixed(2),
-    cu: 'INR',
-    tn: note || 'Order payment'
-  });
-  return `upi://pay?${params.toString()}`;
+  const digits = String(providerMobile).replace(/\D/g, '');
+  if (!digits) return null;
+  const pa = `${digits}@ybl`;
+  const pn = encodeURIComponent(payeeName || 'Doodle G Provider');
+  const am = encodeURIComponent(Number(amount || 0).toFixed(2));
+  const tn = encodeURIComponent(note || 'Payment Request');
+  return `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=INR&tn=${tn}`;
 }
 
 // Products at or below this remaining quantity are flagged as "low stock"
@@ -437,6 +435,10 @@ async function loadProviderProfile(providerId, email) {
     if (emailSettingsEl) emailSettingsEl.textContent = email;
     if (avatarSettingsEl) avatarSettingsEl.src = avatarSrc;
 
+    // Mirror into the mobile topbar avatar (see .mobile-topbar in index.html)
+    const avatarMobileEl = document.getElementById('provider-avatar-mobile');
+    if (avatarMobileEl) avatarMobileEl.src = avatarSrc;
+
     // Display dashboard UI
     authSection.classList.add('hidden');
     panelSection.classList.remove('hidden');
@@ -545,6 +547,28 @@ document.querySelectorAll('.nav-item').forEach(item => {
     switchTab(tab);
   });
 });
+
+// Mobile topbar search icon — each tab (Products/Followers/Orders) already
+// has its own search/filter box, so this jumps to the current tab's box if
+// it has one, otherwise defaults to Products (the most commonly searched
+// tab) and focuses its search input.
+const mobileSearchBtn = document.getElementById('mobile-search-btn');
+if (mobileSearchBtn) {
+  mobileSearchBtn.addEventListener('click', () => {
+    const searchIdByTab = {
+      products: 'product-search',
+      followers: 'follower-search',
+      orders: 'order-search'
+    };
+    const targetTab = searchIdByTab[currentTab] ? currentTab : 'products';
+    if (targetTab !== currentTab) switchTab(targetTab);
+    const input = document.getElementById(searchIdByTab[targetTab]);
+    if (input) {
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      input.focus();
+    }
+  });
+}
 
 // Load All Business Data from DB
 async function loadAllData() {
@@ -1746,4 +1770,3 @@ function updateDashboardStats() {
     topProductsList.appendChild(li);
   });
 }
-
