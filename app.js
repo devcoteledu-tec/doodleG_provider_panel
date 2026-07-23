@@ -63,26 +63,24 @@ function buildCallLink(rawPhone) {
 
 // Builds a standard `upi://pay` deep link so tapping the GPay/PhonePe
 // button on an order opens the customer's installed UPI app with the
-// provider's mobile number, the order amount, and a short note already
-// filled in — ready to send, not just "app opens to a blank pay screen".
+// provider's UPI ID, the order amount, and a short note already filled
+// in — ready to send, not just "app opens to a blank pay screen".
 //
-// The `pa` (payee address) parameter needs to be a real VPA, not a bare
-// phone number, so the provider's UPI-linked mobile number is suffixed
-// with `@ybl` (PhonePe's handle — most Indian mobile numbers registered
-// for UPI resolve through it). If a provider's number isn't itself
-// UPI-registered under that handle, the app will simply fail to find a
-// payee — there's no way to detect that from the browser side. The fix
-// on the provider's end is to double check the UPI-linked mobile number
-// entered in Settings.
-function buildUpiLink(providerMobile, amount, payeeName, note) {
-  if (!providerMobile) return null;
-  const digits = String(providerMobile).replace(/\D/g, '');
-  if (!digits) return null;
-  const pa = `${digits}@ybl`;
+// The `pa` (payee address) parameter must be the provider's actual VPA
+// (e.g. `name@okaxis`, `name@ybl`), used as-is — it is NOT derived from
+// a phone number. Only light cleanup (trim + lowercase) is applied, and
+// we sanity-check it contains an `@` before using it. If the stored
+// value isn't a valid VPA, the app will simply fail to find a payee —
+// there's no way to detect that from the browser side. The fix on the
+// provider's end is to double check the UPI ID entered in Settings.
+function buildUpiLink(providerUpiId, amount, payeeName, note) {
+  if (!providerUpiId) return null;
+  const pa = String(providerUpiId).trim().toLowerCase();
+  if (!pa || !pa.includes('@')) return null;
   const pn = encodeURIComponent(payeeName || 'Doodle G Provider');
   const am = encodeURIComponent(Number(amount || 0).toFixed(2));
   const tn = encodeURIComponent(note || 'Payment Request');
-  return `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=INR&tn=${tn}`;
+  return `upi://pay?pa=${encodeURIComponent(pa)}&pn=${pn}&am=${am}&cu=INR&tn=${tn}`;
 }
 
 // Products at or below this remaining quantity are flagged as "low stock"
@@ -1184,9 +1182,9 @@ async function shareOrderPreviewCombined() {
   }
 
   const status = o.fulfillment_status || o.legacy_status;
-  const providerMobile = currentProvider ? currentProvider.payment_mobile_number : null;
+  const providerUpiId = currentProvider ? currentProvider.payment_mobile_number : null;
   const upiNote = `Order ${o.order_number} - ${o.product_name}`;
-  const upiLink = buildUpiLink(providerMobile, o.line_total, currentProvider ? currentProvider.name : null, upiNote);
+  const upiLink = buildUpiLink(providerUpiId, o.line_total, currentProvider ? currentProvider.name : null, upiNote);
   const shareText = buildShareText(o, status, upiLink);
 
   // Render off-screen so the user never sees the raw card being built.
@@ -1321,9 +1319,9 @@ function openOrderOverview(orderItemId) {
   }
 
   // --- GPay / PhonePe one-tap payment request ---
-  const providerMobile = currentProvider ? currentProvider.payment_mobile_number : null;
+  const providerUpiId = currentProvider ? currentProvider.payment_mobile_number : null;
   const upiNote = `Order ${o.order_number} - ${o.product_name}`;
-  const upiLink = buildUpiLink(providerMobile, o.line_total, currentProvider ? currentProvider.name : null, upiNote);
+  const upiLink = buildUpiLink(providerUpiId, o.line_total, currentProvider ? currentProvider.name : null, upiNote);
   const gpayBtn = document.getElementById('ov-pay-gpay');
   const phonepeBtn = document.getElementById('ov-pay-phonepe');
   const paymentNote = document.getElementById('ov-payment-note');
@@ -1621,7 +1619,7 @@ settingsForm.addEventListener('submit', async (e) => {
   const instagram = document.getElementById('set-instagram').value;
   const avatar = document.getElementById('set-avatar').value;
   const bio = document.getElementById('set-bio').value;
-  const upiMobile = document.getElementById('set-upi-mobile').value;
+  const upiId = document.getElementById('set-upi-mobile').value;
 
   // Aadhaar/PAN: the DB never gives us the full value back (see
   // setupPiiField above), so there's nothing to silently resend on every
@@ -1636,7 +1634,9 @@ settingsForm.addEventListener('submit', async (e) => {
     instagram_handle: instagram || null,
     avatar_url: avatar || null,
     bio: bio || null,
-    payment_mobile_number: upiMobile ? upiMobile.replace(/\D/g, '') : null
+    // Stored as-is (trimmed + lowercased) — this is a UPI ID like
+    // "name@okaxis", not a phone number, so digits must NOT be stripped.
+    payment_mobile_number: upiId ? upiId.trim().toLowerCase() : null
   };
   if (aadhaarInput.dataset.editing === 'true' && aadhaarInput.value.trim()) {
     updates.aadhaar_number = aadhaarInput.value.trim().replace(/[\s-]/g, '');
